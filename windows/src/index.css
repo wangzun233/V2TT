@@ -1,0 +1,26 @@
+:root {
+  font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  color: #13233c;
+  background: #dceafb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; min-width: 1024px; min-height: 100%; margin: 0; }
+#root { display: flow-root; }
+body {
+  min-height: 100vh;
+  overflow: auto;
+  background-color: #e8f2ff;
+  background-image: url('./assets/glass-background.png');
+  background-position: center;
+  background-size: cover;
+  background-attachment: fixed;
+}
+button, input, select { font: inherit; letter-spacing: 0; }
+button { color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+svg { stroke-width: 1.75; }
+::selection { color: #0f172a; background: #bfdbfe; }

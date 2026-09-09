@@ -1,0 +1,29 @@
+{
+  "recordedAt": "2026-09-09T10:25:46.337Z",
+  "core": {
+    "file": "resources/bin/sing-box.exe",
+    "sha256": "a4476dd768168a77e249050066bb32774addefcc37da123978623e7b2819de28",
+    "versionOutput": "sing-box version 1.13.19\n\nEnvironment: go1.26.5 windows/amd64\nTags: with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_ccm,with_ocm,with_naive_outbound,with_purego,badlinkname,tfogo_checklinkname0\nRevision: b5ebaa1fc0f2b94256180b95468e73ef53caa27d\nCGO: disabled",
+    "reportedRevision": "b5ebaa1fc0f2b94256180b95468e73ef53caa27d",
+    "repositoryRevisionResolved": "https://api.github.com/repos/SagerNet/sing-box/commits/b5ebaa1fc0f2b94256180b95468e73ef53caa27d",
+    "sourceArchive": "vendor/sing-box-b5ebaa1.tar.gz",
+    "sourceArchiveSha256": "89725581041c8aa42c79ab6165cac81e8fc297d64656b6aa3af550b98cc2449b",
+    "releaseArchiveByteComparison": "NOT COMPLETED: fresh official binary archive download stalled; existing core retained"
+  },
+  "rules": [
+    {
+      "file": "resources/rules/geoip-cn.srs",
+      "sha256": "0acf5dad38fba9db2dade29ce5e4edc6902220944f30628ae46ed16cb0ec5edd",
+      "verifiedBlobUrl": "https://api.github.com/repos/SagerNet/sing-geoip/git/blobs/52b386508b9d67fa193091f932c0a6eae145595c",
+      "source": "vendor/rules/geoip-cn.json",
+      "sourceSha256": "b0b4cf93614356f9618b04079f3e0fe873e6edfe3f331610edbbdc041cf5d1ec"
+    },
+    {
+      "file": "resources/rules/geosite-cn.srs",
+      "sha256": "23dc7b1af27f8f4b8d39baa046a885eb54ff93ce93cf4de8852c211513b2a7b0",
+      "verifiedBlobUrl": "https://api.github.com/repos/SagerNet/sing-geosite/git/blobs/815c3a6b65d24e24a541f63b8693e0b79ab4c4c2",
+      "source": "vendor/rules/geosite-cn.json",
+      "sourceSha256": "58521061bdbb344560d67592c636819c27b7f638a4a0f662ce7c10e7aca42828"
+    }
+  ]
+}

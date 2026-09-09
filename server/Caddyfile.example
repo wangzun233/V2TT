@@ -1,0 +1,34 @@
+{
+	email admin@example.com
+	servers {
+		# TUIC owns UDP 443 on this host. Do not enable Caddy HTTP/3 here.
+		protocols h1 h2
+	}
+}
+
+daily.example.com {
+	@vless path /REPLACE_WITH_RANDOM_WS_PATH
+	handle @vless {
+		reverse_proxy 127.0.0.1:10000
+	}
+	handle {
+		respond "Service available" 200
+	}
+}
+
+sub.example.com {
+	header {
+		Cache-Control "no-store, private"
+		Referrer-Policy "no-referrer"
+		X-Robots-Tag "noindex, nofollow"
+	}
+	@subscription path /s/*.json
+	handle @subscription {
+		root * /var/lib/v2tt-subscriptions
+		file_server
+	}
+	handle {
+		respond "Not found" 404
+	}
+	# Intentionally no access log and no directory browsing.
+}

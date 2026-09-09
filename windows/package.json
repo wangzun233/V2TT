@@ -1,0 +1,107 @@
+{
+  "name": "v2tt-client",
+  "description": "Windows client for V2TT daily and game proxy routes",
+  "author": "V2TT",
+  "main": "electron/main.cjs",
+  "private": true,
+  "version": "0.2.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build-native.mjs && tsc -b && vite build",
+    "lint": "oxlint src",
+    "test": "vitest run",
+    "test:native": "node --test tests/native/*.test.cjs",
+    "test:e2e": "playwright test",
+    "preview": "vite preview",
+    "desktop": "npm run build && electron .",
+    "release:notices": "node scripts/release-notices.mjs",
+    "release:verify": "node scripts/verify-package.mjs",
+    "dist:win": "npm run build && npm run release:notices && electron-builder --win nsis --x64",
+    "dist:win:portable": "npm run build && electron-builder --win portable --x64",
+    "dist:win:zip": "npm run build && electron-builder --win zip"
+  },
+  "dependencies": {
+    "https-proxy-agent": "7.0.6",
+    "lucide-react": "^1.34.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "@electron/fuses": "1.8.0",
+    "rolldown": "1.2.5",
+    "@playwright/test": "^1.62.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "jsdom": "^30.0.1",
+    "oxlint": "^1.79.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  },
+  "build": {
+    "appId": "top.wangzun233.v2tt.client",
+    "productName": "V2TT Client",
+    "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "asarUnpack": ["electron/watchdog.ps1"],
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.png",
+      "docs/THIRD-PARTY-NOTICES.md",
+      "LICENSES/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin/sing-box.exe",
+        "to": "bin/sing-box.exe"
+      },
+      {
+        "from": "resources/rules",
+        "to": "rules"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "requestedExecutionLevel": "requireAdministrator",
+      "artifactName": "V2TT-Client-${version}-Windows-${arch}.${ext}"
+    },
+    "portable": {
+      "requestExecutionLevel": "admin"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "V2TT Client",
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": ["zh_CN", "en_US"],
+      "displayLanguageSelector": false,
+      "include": "build/installer.nsh",
+      "artifactName": "V2TT-Client-Setup-${version}-Windows-${arch}.${ext}",
+      "uninstallDisplayName": "V2TT Client"
+    }
+  }
+}

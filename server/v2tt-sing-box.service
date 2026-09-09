@@ -1,0 +1,24 @@
+[Unit]
+Description=V2TT sing-box reference service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=v2tt
+Group=v2tt
+ExecStartPre=/usr/local/bin/sing-box check -c /etc/v2tt/sing-box.json
+ExecStart=/usr/local/bin/sing-box run -c /etc/v2tt/sing-box.json
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

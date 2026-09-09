@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "profile": { "id": "smoke-test", "name": "本地验收", "expires_at": null, "update_interval_hours": 1 },
+  "routing": { "daily_node": "daily", "game_node": "game", "default_mode": "smart" },
+  "nodes": [
+    {
+      "id": "daily", "type": "vless", "name": "Daily", "server": "daily.example.com", "server_port": 443,
+      "uuid": "12345678-1234-4234-8234-123456789abc",
+      "tls": { "enabled": true, "server_name": "daily.example.com" },
+      "transport": { "type": "ws", "path": "/test", "host": "daily.example.com" }
+    },
+    {
+      "id": "game", "type": "tuic", "name": "Game", "server": "game.example.com", "server_port": 443,
+      "uuid": "12345678-1234-4234-8234-123456789abd", "password": "fixture-only-not-a-secret",
+      "congestion_control": "bbr", "udp_relay_mode": "native",
+      "tls": { "enabled": true, "server_name": "game.example.com", "alpn": ["h3"] }
+    }
+  ]
+}

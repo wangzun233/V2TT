@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#e8f2ff" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:41920 ws://127.0.0.1:41920" />
+    <title>V2TT Client</title>
+    <style>
+      .startup-screen { box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px; background: #f4f7fb; color: #183044; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; text-align: center; }
+      .startup-screen h1 { margin: 0 0 24px; font-size: 28px; }
+      .startup-screen h2 { margin: 0 0 12px; font-size: 18px; }
+      .startup-screen p { max-width: 420px; margin: 0 0 20px; font-size: 14px; line-height: 1.7; }
+      .startup-screen button { border: 1px solid #176fea; border-radius: 6px; padding: 10px 20px; color: #fff; background: #176fea; cursor: pointer; font: inherit; }
+      body { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"><main class="startup-screen" data-startup-screen role="status">
+      <h1>V2TT Client</h1>
+      <h2 data-startup-title>正在加载界面</h2>
+      <p data-startup-detail>正在读取本机界面资源。</p>
+      <button type="button" data-startup-reload hidden>重新加载界面</button>
+    </main></div>
+    <script defer src="/startup.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

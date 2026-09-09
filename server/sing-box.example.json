@@ -1,0 +1,27 @@
+{
+  "log": { "level": "warn", "timestamp": true },
+  "dns": { "servers": [{ "type": "local", "tag": "local-dns" }] },
+  "inbounds": [
+    {
+      "type": "vless", "tag": "daily-in", "listen": "127.0.0.1", "listen_port": 10000,
+      "users": [{ "name": "demo", "uuid": "00000000-0000-4000-8000-000000000001" }],
+      "transport": { "type": "ws", "path": "/REPLACE_WITH_RANDOM_WS_PATH" }
+    },
+    {
+      "type": "tuic", "tag": "game-in", "listen": "::", "listen_port": 443,
+      "users": [{ "name": "demo", "uuid": "00000000-0000-4000-8000-000000000002", "password": "REPLACE_WITH_RANDOM_PASSWORD" }],
+      "congestion_control": "bbr",
+      "tls": {
+        "enabled": true, "server_name": "game.example.com", "alpn": ["h3"],
+        "certificate_path": "/etc/v2tt/tls/game/fullchain.pem",
+        "key_path": "/etc/v2tt/tls/game/privkey.pem"
+      }
+    }
+  ],
+  "outbounds": [{ "type": "direct", "tag": "direct" }],
+  "route": {
+    "default_domain_resolver": "local-dns",
+    "rules": [{ "action": "resolve" }, { "ip_is_private": true, "action": "reject" }],
+    "final": "direct"
+  }
+}

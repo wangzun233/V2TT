@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-01-01T00:00:00Z",
+  "profile": { "id": "DEMO", "name": "Demo account", "expires_at": null, "update_interval_hours": 1 },
+  "routing": { "default_mode": "smart", "daily_node": "daily", "game_node": "game" },
+  "nodes": [
+    {
+      "id": "daily", "name": "Demo VLESS", "type": "vless", "role": "daily",
+      "server": "daily.example.com", "server_port": 443,
+      "uuid": "00000000-0000-4000-8000-000000000001",
+      "tls": { "enabled": true, "server_name": "daily.example.com" },
+      "transport": { "type": "ws", "path": "/REPLACE_WITH_RANDOM_WS_PATH", "host": "daily.example.com" }
+    },
+    {
+      "id": "game", "name": "Demo TUIC", "type": "tuic", "role": "game",
+      "server": "game.example.com", "server_port": 443,
+      "uuid": "00000000-0000-4000-8000-000000000002", "password": "REPLACE_WITH_RANDOM_PASSWORD",
+      "congestion_control": "bbr", "udp_relay_mode": "native",
+      "tls": { "enabled": true, "server_name": "game.example.com", "alpn": ["h3"] }
+    }
+  ]
+}
