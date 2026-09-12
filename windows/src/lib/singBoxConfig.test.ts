@@ -15,6 +15,16 @@ const gameRule: AppRule = {
 }
 
 describe('buildSingBoxConfig', () => {
+  it('uses reject actions instead of removed special outbounds', () => {
+    const config = buildSingBoxConfig(fallbackManifest, {
+      mode: 'global', appRules: [], strictRoute: true, ipv6: false,
+    })
+    expect(config.outbounds).not.toContainEqual({ type: 'block', tag: 'block' })
+    expect((config.route as { rules: unknown[] }).rules).toContainEqual({
+      network: 'udp', port: 443, action: 'reject', method: 'drop',
+    })
+  })
+
   it('routes configured game applications to TUIC in smart mode', () => {
     const config = buildSingBoxConfig(fallbackManifest, {
       mode: 'smart',

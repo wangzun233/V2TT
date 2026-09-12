@@ -10,7 +10,7 @@ const rules = [
   ['personal-windows-path', /[A-Z]:[\\/]Users[\\/](?!Public(?:[\\/]|$)|Default(?:[\\/]|$))[^\\/\s]+[\\/]/i],
 ]
 const forbidden = /(^|\/)(?:\.env(?:\..*)?|local\.properties|account\.bin|subscription\.bin|manifest\.bin|preferences\.json|service-account-credentials\.json)$|\.(?:pem|key|p12|pfx|jks|keystore|log)$/i
-const paths = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean)
+const paths = [...new Set(execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean))]
 if (!paths.length) throw new Error('No tracked files to review')
 let failures = 0
 for (const path of paths) {
@@ -24,5 +24,5 @@ for (const path of paths) {
     if (review.some((text) => pattern.test(text))) { console.error(`${path}: ${category}`); failures++ }
   }
 }
-console.log(JSON.stringify({ checkedFiles: paths.length, findings: failures, scope: 'tracked working-tree files; archives and user-specific denylist require separate review' }))
+console.log(JSON.stringify({ checkedFiles: paths.length, findings: failures, scope: 'tracked and non-ignored new files; archives and user-specific denylist require separate review' }))
 process.exitCode = failures ? 1 : 0

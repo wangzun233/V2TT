@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Menu, nativeImage, safeStorage, Tray, dialog, powerMonitor } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, safeStorage, Tray, dialog, powerMonitor, net, shell } = require('electron')
+const { checkUpdate } = require('./updates.cjs')
 const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
@@ -36,6 +37,28 @@ let expiryTimer = null
 let bootPromise = Promise.resolve()
 let logErrorShown = false
 let renderCheck = null
+let updateTimer = null
+let updateBusy = false
+let notifiedVersion = ''
+async function checkClientUpdate(manual = false) {
+  if (quitting || updateBusy) return
+  updateBusy = true
+  try {
+    const update = await checkUpdate((url, options) => net.fetch(url, options), app.getVersion())
+    if (quitting) return
+    if (!update) {
+      if (manual) await dialog.showMessageBox({ message: '当前已是最新版本', detail: `V2TT Client ${app.getVersion()}`, buttons: ['确定'] })
+      return
+    }
+    if (!manual && notifiedVersion === update.version) return
+    notifiedVersion = update.version
+    const { response } = await dialog.showMessageBox({ type: 'info', title: 'V2TT Client 更新', message: `发现新版本 ${update.version}`,
+      detail: '打开官方发布页查看更新说明并下载安装包。下载不会断开代理；安装前请退出客户端，不要清除个人数据。', buttons: ['打开官方下载页', '稍后'], defaultId: 1, cancelId: 1 })
+    if (response === 0 && !quitting) await shell.openExternal(update.releaseUrl)
+  } catch {
+    if (manual && !quitting) await dialog.showMessageBox({ type: 'warning', message: '暂时无法检查更新', detail: '请确认 GitHub 可以访问后重试。当前代理连接不受影响。', buttons: ['确定'] })
+  } finally { updateBusy = false }
+}
 const single = (!app.isPackaged && process.env.V2TT_ALLOW_MULTIPLE_INSTANCES === '1') || app.requestSingleInstanceLock()
 
 function log(event, details = {}) {
@@ -79,6 +102,7 @@ function updateTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开 V2TT Client', click: showWindow },
     { label: '重新加载界面', click: () => { showWindow(); window?.reload() } },
+    { label: '检查更新', click: () => { void checkClientUpdate(true) } },
     { label, enabled: false }, { type: 'separator' },
     { label: '退出并断开连接', click: () => app.quit() },
   ]))
@@ -353,6 +377,10 @@ if (single) {
   app.whenReady().then(() => {
     createWindow()
     bootPromise = queue(bootstrap).catch((error) => { log('BOOT_FAILED', error); runtime.setError(error.message); showWindow() })
+    if (app.isPackaged) {
+      void bootPromise.then(() => { if (!quitting) void checkClientUpdate() })
+      updateTimer = setInterval(() => { void checkClientUpdate() }, 6 * 3600000)
+    }
     powerMonitor.on('resume', () => {
       if (runtime.status().state !== 'connected' || runtime.status().mode === 'direct') return
       void queue(() => connect(settings.lastMode)).catch((error) => runtime.setError(error.message))
@@ -370,6 +398,7 @@ app.on('before-quit', (event) => {
   clearTimeout(recoverTimer)
   clearInterval(refreshTimer)
   clearInterval(expiryTimer)
+  clearInterval(updateTimer)
   clearTimeout(renderCheck)
   void queue(() => runtime.stop()).catch((error) => log('QUIT_CLEANUP_FAILED', error)).finally(() => { quitReady = true; tray?.destroy(); app.quit() })
 })

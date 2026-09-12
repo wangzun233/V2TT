@@ -15,10 +15,41 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class ClientSmokeTest {
+    @Test fun updateDialogShowsOnlyV2ttRelease() {
+        val previous = Settings.checkUpdateEnabled
+        val previousShown = Settings.lastShownUpdateVersion
+        Settings.checkUpdateEnabled = false
+        Settings.lastShownUpdateVersion = 0
+        io.nekohasekai.sfa.update.UpdateState.setUpdate(io.nekohasekai.sfa.update.UpdateInfo(
+            999999, "999.0.0", "https://github.com/wangzun233/V2TT/releases/tag/test-only",
+            "https://github.com/wangzun233/V2TT/releases/tag/test-only", "Isolated update test", false,
+        ))
+        try {
+            androidx.test.core.app.ActivityScenario.launch(io.nekohasekai.sfa.compose.MainActivity::class.java).use {
+                val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+                fun hasVersion(node: android.view.accessibility.AccessibilityNodeInfo?): Boolean {
+                    if (node == null) return false
+                    if (node.text?.contains("999.0.0") == true) return true
+                    return (0 until node.childCount).any { hasVersion(node.getChild(it)) }
+                }
+                var found = false
+                for (attempt in 0 until 50) {
+                    if (hasVersion(automation.rootInActiveWindow)) { found = true; break }
+                    Thread.sleep(100)
+                }
+                assertTrue("Update dialog must show the candidate version", found)
+            }
+        } finally {
+            io.nekohasekai.sfa.update.UpdateState.setUpdate(null)
+            Settings.checkUpdateEnabled = previous
+            Settings.lastShownUpdateVersion = previousShown
+        }
+    }
+
     private fun fixture(): String = InstrumentationRegistry.getInstrumentation().context.assets.open("manifest.json").bufferedReader().use { it.readText() }
 
     @Test fun a_nativeCoreLoadsAndValidatesAllModes() {
-        assertEquals("1.13.19", Libbox.version())
+        assertEquals("1.14.0", Libbox.version())
         DeviceManifest.modes.forEach { mode -> Libbox.checkConfig(ProfileContent.forCore(fixture(), mode)) }
     }
 

@@ -20,7 +20,7 @@ npm run release:verify
 
 输出位于 `windows/release`。通过锁文件固定依赖；不要手工拼装 EXE 或复用含个人运行目录的压缩包。安装包默认未签名，正式代码签名需要单独保管证书及凭证。
 
-`resources/bin/sing-box.exe` 是原工程已经使用的 1.13.19 内核。报告的源码提交固定在下文；独立官方发行 ZIP 逐字节比对此前未完成，不将它描述为已通过供应链独立认证。
+`resources/bin/sing-box.exe` 使用 sing-box 1.14.0，由固定的上游源码本地编译，并非官方发行 ZIP 中的二进制。源码提交为 `0b8995879f29a9b98ee027bc17b75e101445b238`。在仓库根目录运行 `scripts/build-core.ps1 -Platform windows -ToolchainRoot <工具链目录>` 可重新编译；脚本先验证随仓库源码归档的 SHA256。
 
 ## Android
 
@@ -37,13 +37,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-android.ps1 -S
 要重编译核心，在仓库根目录操作：
 
 ```powershell
-git clone https://github.com/SagerNet/sing-box v2tt-android-core
-git -C v2tt-android-core checkout b5ebaa1fc0f2b94256180b95468e73ef53caa27d
 cd android
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-android.ps1
 ```
 
-核心编译使用 Go 1.25.12、gomobile/gobind 0.1.12；具体标签见脚本。原始核心源码归档位于 `vendor/sing-box-b5ebaa1.tar.gz`，不含私人 Git 历史。
+核心编译使用 Go 1.25.12、gomobile/gobind 0.1.12；具体标签见 `scripts/build-core.ps1`。1.14.0 原始核心源码归档位于 `vendor/sing-box-0b89958.tar.gz`，不含私人 Git 历史。旧版归档保留供追溯。
 
 Android 输出位于 `android/app/build/outputs/apk/other/debug`。正式签名需要自己创建并离线保管的 keystore，通过本地属性提供，不能提交私钥或签名口令。上游公开 keystore 已从发布快照排除。
 

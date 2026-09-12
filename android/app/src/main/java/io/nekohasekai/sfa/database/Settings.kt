@@ -42,7 +42,7 @@ object Settings {
     var startedByUser by dataStore.boolean(SettingsKey.STARTED_BY_USER)
 
     var updateSource by dataStore.string(SettingsKey.UPDATE_SOURCE) { "github" }
-    var checkUpdateEnabled by dataStore.boolean(SettingsKey.CHECK_UPDATE_ENABLED) { false }
+    var checkUpdateEnabled by dataStore.boolean(SettingsKey.CHECK_UPDATE_ENABLED) { true }
     var updateCheckPrompted by dataStore.boolean(SettingsKey.UPDATE_CHECK_PROMPTED) { false }
     var updateTrack by dataStore.string(SettingsKey.UPDATE_TRACK) {
         val versionName = BuildConfig.VERSION_NAME.lowercase()

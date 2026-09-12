@@ -83,7 +83,10 @@ class VPNService :
         }
 
         if (options.autoRoute) {
-            builder.addDnsServer(options.dnsServerAddress.value)
+            val dnsServers = options.dnsServerAddress
+            while (dnsServers.hasNext()) {
+                builder.addDnsServer(dnsServers.next())
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val inet4RouteAddress = options.inet4RouteAddress

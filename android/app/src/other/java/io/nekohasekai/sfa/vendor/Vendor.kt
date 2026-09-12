@@ -44,7 +44,11 @@ object Vendor : VendorInterface {
             Log.e(TAG, "checkUpdate: ", e)
             if (byUser) {
                 activity.runOnUiThread {
-                    showNoUpdatesDialog(activity)
+                    MaterialAlertDialogBuilder(activity)
+                        .setTitle(R.string.check_update)
+                        .setMessage("暂时无法检查更新，请确认 GitHub 可以访问后重试。")
+                        .setPositiveButton(R.string.ok, null)
+                        .show()
                 }
             }
         }
@@ -95,19 +99,12 @@ object Vendor : VendorInterface {
         onCropArea: ((QRCodeCropArea?) -> Unit)?,
     ): ImageAnalysis.Analyzer? = null
 
-    override val hasCustomUpdate = true
+    // V2TT opens its release page; do not offer privileged or silent installation controls.
+    override val hasCustomUpdate = false
 
-    override val updateSources = listOf(UpdateSource.GITHUB, UpdateSource.FDROID)
+    override val updateSources = listOf(UpdateSource.GITHUB)
 
-    override fun checkUpdateAsync(): UpdateInfo? = when (UpdateSource.fromString(Settings.updateSource)) {
-        UpdateSource.FDROID -> checkFDroidUpdate(Application.application)
-        UpdateSource.GITHUB -> {
-            val track = UpdateTrack.fromString(Settings.updateTrack)
-            GitHubUpdateChecker().use { checker ->
-                checker.checkUpdate(track)
-            }
-        }
-    }
+    override fun checkUpdateAsync(): UpdateInfo? = GitHubUpdateChecker().use { it.checkUpdate(UpdateTrack.STABLE) }
 
     override fun scheduleAutoUpdate() {
         UpdateWorker.schedule(io.nekohasekai.sfa.Application.application)
@@ -134,6 +131,13 @@ object Vendor : VendorInterface {
     }
 
     override suspend fun downloadAndInstall(context: android.content.Context, downloadUrl: String) {
+        if (io.nekohasekai.sfa.BuildConfig.APPLICATION_ID == "top.wangzun233.v2tt.android") {
+            val url = io.nekohasekai.sfa.v2tt.ClientUpdate.validateReleaseUrl(downloadUrl)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            return
+        }
         val cachedApk = UpdateState.cachedApkFile.value
         val apkFile = if (cachedApk != null && cachedApk.exists() && cachedApk.length() > 0) {
             cachedApk

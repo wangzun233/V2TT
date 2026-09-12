@@ -164,7 +164,6 @@ export function buildSingBoxConfig(
       vlessOutbound(daily),
       tuicOutbound(game),
       { type: 'direct', tag: 'direct' },
-      { type: 'block', tag: 'block' },
     ],
     route: {
       auto_detect_interface: true,

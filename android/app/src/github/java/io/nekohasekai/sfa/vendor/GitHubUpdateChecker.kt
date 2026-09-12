@@ -27,6 +27,11 @@ class GitHubUpdateChecker : Closeable {
 
     fun checkUpdate(track: UpdateTrack): UpdateInfo? {
         // V2TT has a different package/signing identity; upstream APKs are not updates.
+        if (BuildConfig.APPLICATION_ID == "top.wangzun233.v2tt.android") {
+            val candidate = io.nekohasekai.sfa.v2tt.ClientUpdate.check(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE) ?: return null
+            return UpdateInfo(candidate.versionCode, candidate.version, candidate.releaseUrl, candidate.releaseUrl,
+                "打开 V2TT 官方发布页下载安装包，选择更新即可保留订阅。不会静默安装或自动断开代理。", false)
+        }
         if (BuildConfig.APPLICATION_ID != "io.nekohasekai.sfa") return null
         val releases = getReleases()
         var selected: ReleaseCandidate? = null

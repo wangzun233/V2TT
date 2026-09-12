@@ -8,6 +8,7 @@ kotlin { jvmToolchain(21) }
 sourceSets.main {
     kotlin.srcDir("../app/src/main/java/io/nekohasekai/sfa/v2tt")
     kotlin.include("DeviceManifest.kt")
+    kotlin.include("ClientUpdate.kt")
 }
 tasks.test {
     systemProperty("serverExample", rootProject.file("../server/subscription.example.json").absolutePath)

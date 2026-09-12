@@ -4,7 +4,7 @@
   "author": "V2TT",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.3",
   "type": "module",
   "scripts": {
     "dev": "vite",

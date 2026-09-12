@@ -11,6 +11,7 @@ import io.nekohasekai.libbox.LogEntry
 import io.nekohasekai.libbox.LogIterator
 import io.nekohasekai.libbox.OutboundGroup
 import io.nekohasekai.libbox.OutboundGroupIterator
+import io.nekohasekai.libbox.OutboundGroupItemIterator
 import io.nekohasekai.libbox.StatusMessage
 import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.sfa.ktx.toList
@@ -120,6 +121,9 @@ open class CommandClient(
     }
 
     private inner class ClientHandler : CommandClientHandler {
+        // This client subscribes to groups/status, not the optional flat outbound feed.
+        override fun writeOutbounds(message: OutboundGroupItemIterator?) {}
+
         override fun connected() {
             getAllHandlers().forEach { it.onConnected() }
             Log.d("CommandClient", "connected")

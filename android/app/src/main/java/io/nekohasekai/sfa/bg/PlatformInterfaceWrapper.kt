@@ -8,6 +8,11 @@ import android.system.OsConstants
 import android.util.Log
 import androidx.annotation.RequiresApi
 import io.nekohasekai.libbox.ConnectionOwner
+import io.nekohasekai.libbox.BridgeOptions
+import io.nekohasekai.libbox.BridgeSession
+import io.nekohasekai.libbox.NeighborUpdateListener
+import io.nekohasekai.libbox.PlatformUser
+import io.nekohasekai.libbox.ShellSession
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
@@ -21,9 +26,6 @@ import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.net.InterfaceAddress
 import java.net.NetworkInterface
-import java.security.KeyStore
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import io.nekohasekai.libbox.NetworkInterface as LibboxNetworkInterface
 
 interface PlatformInterfaceWrapper : PlatformInterface {
@@ -155,22 +157,26 @@ interface PlatformInterfaceWrapper : PlatformInterface {
 
     override fun localDNSTransport(): LocalDNSTransport? = LocalResolver
 
-    @OptIn(ExperimentalEncodingApi::class)
-    override fun systemCertificates(): StringIterator {
-        val certificates = mutableListOf<String>()
-        val keyStore = KeyStore.getInstance("AndroidCAStore")
-        if (keyStore != null) {
-            keyStore.load(null, null)
-            val aliases = keyStore.aliases()
-            while (aliases.hasMoreElements()) {
-                val cert = keyStore.getCertificate(aliases.nextElement())
-                certificates.add(
-                    "-----BEGIN CERTIFICATE-----\n" + Base64.encode(cert.encoded) + "\n-----END CERTIFICATE-----",
-                )
-            }
-        }
-        return StringArray(certificates.iterator())
+    // 1.14 reads Android system certificates through JNI. Privileged host features stay disabled.
+    override fun cancelNotification(identifier: String, typeID: Int) {
+        Application.notification.cancel(typeID)
     }
+
+    override fun startNeighborMonitor(listener: NeighborUpdateListener) {
+        throw UnsupportedOperationException("Neighbor monitoring is unavailable")
+    }
+    override fun closeNeighborMonitor(listener: NeighborUpdateListener) {}
+    override fun registerMyInterface(name: String) {}
+    override fun usePlatformShell(): Boolean = false
+    override fun checkPlatformShell() { throw UnsupportedOperationException("Platform shell is disabled") }
+    override fun openShellSession(user: PlatformUser, command: String, environ: StringIterator, term: String, rows: Int, cols: Int): ShellSession =
+        throw UnsupportedOperationException("Platform shell is disabled")
+    override fun lookupUser(username: String): PlatformUser = throw UnsupportedOperationException("Platform shell is disabled")
+    override fun lookupSFTPServer(): String = throw UnsupportedOperationException("SFTP is disabled")
+    override fun readSystemSSHHostKey(): String = throw UnsupportedOperationException("SSH host access is disabled")
+    override fun tailscaleHostname(): String = "V2TT-Android"
+    override fun usePlatformBridge(): Boolean = false
+    override fun createBridge(options: BridgeOptions): BridgeSession = throw UnsupportedOperationException("Platform bridge is disabled")
 
     private class InterfaceArray(private val iterator: Iterator<LibboxNetworkInterface>) : NetworkInterfaceIterator {
         override fun hasNext(): Boolean = iterator.hasNext()

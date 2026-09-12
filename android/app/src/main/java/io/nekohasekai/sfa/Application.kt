@@ -38,7 +38,7 @@ class Application : Application() {
         super.onCreate()
         AppLifecycleObserver.register(this)
 
-//        Seq.setContext(this)
+        Seq.setContext(this)
         Libbox.setLocale(Locale.getDefault().toLanguageTag().replace("-", "_"))
         HookStatusClient.register(this)
         PrivilegeSettingsClient.register(this)
@@ -77,9 +77,10 @@ class Application : Application() {
                 it.fixAndroidStack = Bugs.fixAndroidStack
                 it.logMaxLines = 3000
                 it.debug = BuildConfig.DEBUG
+                it.crashReportSource = "app"
+                it.appVersion = BuildConfig.VERSION_NAME
             },
         )
-        Libbox.redirectStderr(File(workingDir, "stderr.log").path)
     }
 
     companion object {

@@ -3,7 +3,6 @@ param([switch]$SkipCore, [switch]$Release,
 $ErrorActionPreference = 'Stop'
 $root = $ToolchainRoot
 $project = Split-Path $PSScriptRoot
-$core = Join-Path (Split-Path $project) 'v2tt-android-core'
 $env:JAVA_HOME = "$root\jdk"
 $env:ANDROID_HOME = "$root\sdk"
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
@@ -20,19 +19,7 @@ if ($env:HTTPS_PROXY) {
     }
 }
 if (!$SkipCore) {
-    Push-Location $core
-    try {
-        $revision = & git rev-parse HEAD
-        if ($revision -ne 'b5ebaa1fc0f2b94256180b95468e73ef53caa27d') { throw 'Unexpected sing-box revision' }
-        & go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-        if ($LASTEXITCODE -ne 0) { throw 'gomobile installation failed' }
-        & go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
-        if ($LASTEXITCODE -ne 0) { throw 'gobind installation failed' }
-        New-Item -ItemType Directory -Force "$project\app\libs" | Out-Null
-        # Build only the protocols required by V2TT, from the unmodified pinned source.
-        & gomobile bind -o "$project\app\libs\libbox.aar" -target android/arm64,android/amd64 -androidapi 26 -javapkg io.nekohasekai -libname box -trimpath -buildvcs=false -ldflags '-X github.com/sagernet/sing-box/constant.Version=1.13.19 -s -w -buildid= -checklinkname=0' -tags 'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0' ./experimental/libbox
-        if ($LASTEXITCODE -ne 0) { throw 'libbox build failed' }
-    } finally { Pop-Location }
+    & (Join-Path (Split-Path $project) 'scripts/build-core.ps1') -Platform android -ToolchainRoot $ToolchainRoot
 }
 Push-Location $project
 try {

@@ -457,4 +457,10 @@ class BoxService(private val service: Service, private val platformInterface: Pl
     override fun writeDebugMessage(message: String?) {
         Log.d("sing-box", message!!)
     }
+
+    override fun connectSSHAgent(): Int = throw UnsupportedOperationException("SSH agent is disabled")
+
+    override fun triggerNativeCrash() {
+        throw UnsupportedOperationException("Intentional native crashes are disabled")
+    }
 }

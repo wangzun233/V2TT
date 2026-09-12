@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "windows": {
+    "version": "0.2.3",
+    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v2026.09.11-update-preview"
+  },
+  "android": {
+    "version": "0.1.2",
+    "versionCode": 3,
+    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v2026.09.11-update-preview"
+  }
+}

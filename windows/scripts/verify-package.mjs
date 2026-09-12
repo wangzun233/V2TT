@@ -10,7 +10,7 @@ const asar = path.join(packaged, 'resources/app.asar')
 const hash = (file) => createHash('sha256').update(readFileSync(file)).digest('hex')
 const files = listPackage(asar).map((file) => file.replaceAll('\\', '/').replace(/^\//, ''))
 for (const file of ['dist/index.html', 'dist/startup.js', 'electron/main.cjs', 'electron/preload.cjs', 'electron/runtime.cjs',
-  'electron/state.cjs', 'electron/network.cjs', 'electron/startup.cjs', 'electron/generated/config.cjs',
+  'electron/state.cjs', 'electron/network.cjs', 'electron/startup.cjs', 'electron/updates.cjs', 'electron/generated/config.cjs',
   'docs/THIRD-PARTY-NOTICES.md', 'LICENSES/sing-box.txt', 'LICENSES/sing-geoip.txt', 'LICENSES/sing-geosite.txt', 'LICENSES/GPL-3.0.txt', 'LICENSES/npm/index.json']) {
   assert.ok(files.includes(file), `Missing packaged file: ${file}`)
 }

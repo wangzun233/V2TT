@@ -61,7 +61,9 @@ class UpdateWorker(private val appContext: Context, params: WorkerParameters) : 
         Log.d(TAG, "Checking for updates...")
 
         return try {
-            val updateInfo = when (UpdateSource.fromString(Settings.updateSource)) {
+            val updateInfo = if (io.nekohasekai.sfa.BuildConfig.APPLICATION_ID == "top.wangzun233.v2tt.android") {
+                GitHubUpdateChecker().use { it.checkUpdate(UpdateTrack.STABLE) }
+            } else when (UpdateSource.fromString(Settings.updateSource)) {
                 UpdateSource.FDROID -> checkFDroidUpdate(appContext)
                 UpdateSource.GITHUB -> {
                     val track = UpdateTrack.fromString(Settings.updateTrack)
@@ -76,6 +78,7 @@ class UpdateWorker(private val appContext: Context, params: WorkerParameters) : 
 
             Log.d(TAG, "Update available: ${updateInfo.versionName}")
             UpdateState.setUpdate(updateInfo)
+            if (io.nekohasekai.sfa.BuildConfig.APPLICATION_ID == "top.wangzun233.v2tt.android") return Result.success()
 
             if (Settings.silentInstallEnabled && ApkInstaller.canSilentInstall()) {
                 Log.d(TAG, "Downloading update...")
