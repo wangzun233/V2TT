@@ -6,12 +6,12 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 
 ## 下载与使用
 
-安装包位于本仓库的 [Releases](https://github.com/wangzun233/V2TT/releases)。私有仓库需要获授权的 GitHub 账号才能下载；不要为了分发而共享 GitHub 密码。
+安装包位于本仓库的 [更新提醒预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.11-update-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
 
 | 平台 | 本次版本 | 文件 | 说明 |
 | --- | --- | --- | --- |
-| Windows 10/11 x64 | 0.2.1 脱敏重打包 | `V2TT-Client-Setup-0.2.1-Windows-x64.exe` | 安装程序，无数字签名 |
-| Android 8.0+ ARM64 | 0.1.0 Preview | `V2TT-Android-0.1.0-arm64-preview.apk` | Debug 签名，已收到用户手机联网正常的反馈 |
+| Windows 10/11 x64 | 0.2.3 Preview | `V2TT-Client-Setup-0.2.3-Windows-x64.exe` | 安装程序，无数字签名 |
+| Android 8.0+ ARM64 | 0.1.2 Preview | `V2TT-Android-0.1.2-arm64-v8a-debug.apk` | Debug 签名；本轮通过模拟器测试，仍需真机验证 |
 
 安装后自行导入管理员通过私密渠道发放的 **V2TT Client 专属 HTTPS JSON 订阅**。不是 Clash YAML、Hiddify 订阅或单节点分享链接。安装包不提供账号，不保证任何地区、运营商或目标网站可用。
 
@@ -20,6 +20,7 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 - [订阅格式与账号有效期](docs/SUBSCRIPTION.md)
 - [脱敏服务器配置和部署说明](server/README.md)
 - [构建说明](docs/BUILD.md)
+- [在线更新提醒及发布流程](docs/UPDATES.md)
 - [隐私边界与发布检查](docs/PRIVACY.md)
 - [测试结果及已知限制](docs/VALIDATION.md)
 
@@ -49,6 +50,6 @@ vendor/    固定内核源码归档和可编辑国内规则数据
 
 ## 来源与许可证
 
-Android 基于 [sing-box for Android](https://github.com/SagerNet/sing-box-for-android)，内核为 [sing-box](https://github.com/SagerNet/sing-box) 1.13.19。本项目不是 SagerNet、Cloudflare 或 OpenAI 官方产品。
+Android 基于 [sing-box for Android](https://github.com/SagerNet/sing-box-for-android)，内核为 [sing-box](https://github.com/SagerNet/sing-box) 1.14.0。本项目不是 SagerNet、Cloudflare 或 OpenAI 官方产品。
 
-保留各组件的许可证；Android 的许可证见 `android/LICENSE`，其他组件说明见 `windows/docs/THIRD-PARTY-NOTICES.md`。根目录 `LICENSE` 保留 GPLv3 文本，不替换第三方组件自己的授权条款。分发二进制时需同时提供对应源码及许可证。未建立正式签名和自动更新服务，本次按预发布交付。
+保留各组件的许可证；Android 的许可证见 `android/LICENSE`，其他组件说明见 `windows/docs/THIRD-PARTY-NOTICES.md`。根目录 `LICENSE` 保留 GPLv3 文本，不替换第三方组件自己的授权条款。分发二进制时需同时提供对应源码及许可证。支持更新检查和官方下载页跳转，不静默安装；尚未建立正式签名体系，本次按预发布交付。
