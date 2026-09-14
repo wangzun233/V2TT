@@ -6,6 +6,7 @@ const path = require('node:path')
 const { performance } = require('node:perf_hooks')
 const { buildSingBoxConfig } = require('./generated/config.cjs')
 const { freePort, probe } = require('./network.cjs')
+const measurement = require('./measurement.cjs')
 const { validateMode, assertActive, atomicWrite, redact } = require('./state.cjs')
 const run = promisify(execFile)
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -21,6 +22,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
   let failureCount = 0
   let sampleRequest = null
   let report = []
+  const meter = measurement.createMeasurement()
   let status = { state: 'disconnected', mode: 'smart', downloadBytes: 0, uploadBytes: 0, downloadRate: 0, uploadRate: 0, error: '' }
   const update = (next) => { status = { ...status, ...next }; onChange?.(status); return { ...status } }
   const controllerFetch = (endpoint, timeout = 1000) => fetch(`http://127.0.0.1:${controller.port}${endpoint}`, {
@@ -28,6 +30,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
   })
 
   async function stop() {
+    meter.cancel()
     const current = child
     if (current?.pid && current.exitCode === null) {
       stopping.add(current)
@@ -59,12 +62,12 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
       if (!fs.existsSync(binary)) throw new Error('代理内核文件缺失，请重新安装并检查安全软件的隔离记录')
       for (const name of ['geoip-cn', 'geosite-cn']) if (!fs.existsSync(path.join(rules, `${name}.srs`))) throw new Error('国内分流规则缺失，请重新安装')
       const ports = new Set()
-      while (ports.size < 3) ports.add(await freePort())
-      const [port, dailyPort, gamePort] = [...ports]
-      controller = { port, dailyPort, gamePort, secret: crypto.randomBytes(24).toString('hex'), password: crypto.randomBytes(24).toString('hex') }
+      while (ports.size < 4) ports.add(await freePort())
+      const [port, dailyPort, gamePort, directPort] = [...ports]
+      controller = { port, dailyPort, gamePort, directPort, secret: crypto.randomBytes(24).toString('hex'), password: crypto.randomBytes(24).toString('hex') }
       const config = buildSingBoxConfig(manifest, { ...settings, mode, ruleSetDirectory: rules })
       config.experimental.clash_api = { external_controller: `127.0.0.1:${port}`, secret: controller.secret }
-      for (const [role, listenPort, outbound] of [['daily', dailyPort, 'daily-vless'], ['game', gamePort, 'game-tuic']]) {
+      for (const [role, listenPort, outbound] of [['daily', dailyPort, 'daily-vless'], ['game', gamePort, 'game-tuic'], ['direct', directPort, 'direct']]) {
         config.inbounds.push({ type: 'mixed', tag: `probe-${role}`, listen: '127.0.0.1', listen_port: listenPort, users: [{ username: 'probe', password: controller.password }] })
         config.route.rules.unshift({ inbound: [`probe-${role}`], outbound })
       }
@@ -80,6 +83,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
       core.once('exit', (code) => {
         log('CORE_EXIT', { code })
         if (child !== core) return
+        meter.cancel()
         child = null
         controller = null
         fs.rmSync(configPath, { force: true })
@@ -150,6 +154,16 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
 
   return {
     start, stop, testNode,
+    cancelMeasurement: meter.cancel,
+    measurementStatus: meter.status,
+    startMeasurement(manifest, id, kind) {
+      if (!controller || !child || status.state !== 'connected') throw new Error('请先连接代理后测试')
+      const daily = manifest.nodes.find((n) => n.type === 'vless')
+      const game = manifest.nodes.find((n) => n.type === 'tuic')
+      return meter.start({ id, kind, hostname: game.server, servername: daily.tls.server_name,
+        token: id === 'tuic' ? game.uuid : daily.uuid,
+        port: id === 'tuic' ? controller.gamePort : id === 'direct' ? controller.directPort : controller.dailyPort, password: controller.password })
+    },
     status: () => ({ ...status }),
     setMode: (mode) => update({ mode }),
     setError: (error) => update({ error }),

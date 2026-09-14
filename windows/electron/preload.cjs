@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('v2tt', {
+  startMeasurement: (payload) => ipcRenderer.invoke('measurement:start', payload),
+  measurementStatus: () => ipcRenderer.invoke('measurement:status'),
+  cancelMeasurement: () => ipcRenderer.invoke('measurement:cancel'),
   getManifest: () => ipcRenderer.invoke('manifest:get'),
   refreshManifest: () => ipcRenderer.invoke('manifest:refresh'),
   getSubscription: () => ipcRenderer.invoke('subscription:get'),

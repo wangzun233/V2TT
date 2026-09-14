@@ -312,6 +312,12 @@ register('proxy:set-mode', async (payload) => {
   return runtime.setMode(mode)
 }, true)
 register('diagnostics:run', () => runtime.diagnose(requireAccount(), source), true)
+register('measurement:start', (payload) => {
+  if (!['direct', 'vless', 'tuic'].includes(payload?.id) || !['latency', 'speed'].includes(payload?.kind)) throw new Error('无效的测速参数')
+  return runtime.startMeasurement(requireAccount(), payload.id, payload.kind)
+})
+register('measurement:status', () => runtime.measurementStatus())
+register('measurement:cancel', () => runtime.cancelMeasurement())
 register('diagnostics:node', (payload) => {
   if (!['vless', 'tuic'].includes(payload?.id)) throw new Error('无效的测试线路')
   return runtime.testNode(payload.id)

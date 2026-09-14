@@ -107,6 +107,7 @@ fun V2ttControls(profile: Profile?, status: Status, onImport: () -> Unit, onRefr
             FilledTonalButton(onClick = onImport) { Icon(Icons.Default.AddLink, null); Spacer(Modifier.width(8.dp)); Text("导入 V2TT 订阅") }
         }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (name != null) MeasurementSheet(connected = status == Status.Started && !busy)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         HorizontalDivider()
     }

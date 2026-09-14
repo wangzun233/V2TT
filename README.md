@@ -6,12 +6,12 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 
 ## 下载与使用
 
-安装包位于本仓库的 [更新提醒预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.11-update-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
+安装包位于本仓库的 [网络测速预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
 
 | 平台 | 本次版本 | 文件 | 说明 |
 | --- | --- | --- | --- |
-| Windows 10/11 x64 | 0.2.3 Preview | `V2TT-Client-Setup-0.2.3-Windows-x64.exe` | 安装程序，无数字签名 |
-| Android 8.0+ ARM64 | 0.1.2 Preview | `V2TT-Android-0.1.2-arm64-v8a-debug.apk` | Debug 签名；本轮通过模拟器测试，仍需真机验证 |
+| Windows 10/11 x64 | 0.2.4 Preview | `V2TT-Client-Setup-0.2.4-Windows-x64.exe` | 安装程序，无数字签名 |
+| Android 8.0+ ARM64 | 0.1.3 Preview | `V2TT-Android-0.1.3-arm64-v8a-debug.apk` | Debug 签名；本轮通过模拟器测试，仍需真机验证 |
 
 安装后自行导入管理员通过私密渠道发放的 **V2TT Client 专属 HTTPS JSON 订阅**。不是 Clash YAML、Hiddify 订阅或单节点分享链接。安装包不提供账号，不保证任何地区、运营商或目标网站可用。
 
@@ -21,6 +21,7 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 - [脱敏服务器配置和部署说明](server/README.md)
 - [构建说明](docs/BUILD.md)
 - [在线更新提醒及发布流程](docs/UPDATES.md)
+- [延迟、下载和上传测速](docs/NETWORK-MEASUREMENT.md)
 - [隐私边界与发布检查](docs/PRIVACY.md)
 - [测试结果及已知限制](docs/VALIDATION.md)
 

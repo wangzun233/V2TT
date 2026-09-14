@@ -15,6 +15,21 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class ClientSmokeTest {
+    @Test fun measurementRoutesKeepAuthenticationAndTlsValidation() {
+        try {
+            val config = MeasurementAccess.attach(ProfileContent.forCore(fixture(), "smart"))
+            Libbox.checkConfig(config)
+            val access = MeasurementAccess.current!!
+            assertEquals(3, access.ports.distinct().size)
+            assertTrue(access.password.length >= 32)
+            assertTrue(config.contains("override_address"))
+            assertFalse(config.contains("\"insecure\":true"))
+            val previous = access.password
+            MeasurementAccess.attach(ProfileContent.forCore(fixture(), "direct"))
+            assertNotEquals(previous, MeasurementAccess.current!!.password)
+        } finally { MeasurementAccess.clear() }
+        assertNull(MeasurementAccess.current)
+    }
     @Test fun updateDialogShowsOnlyV2ttRelease() {
         val previous = Settings.checkUpdateEnabled
         val previousShown = Settings.lastShownUpdateVersion

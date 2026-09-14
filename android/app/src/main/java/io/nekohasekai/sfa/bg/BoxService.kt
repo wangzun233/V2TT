@@ -146,7 +146,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
             }
 
             ProfileContent.assertUsable(profile)
-            val content = ProfileContent.forCore(File(profile.typed.path).readText())
+            val content = io.nekohasekai.sfa.v2tt.MeasurementAccess.attach(ProfileContent.forCore(File(profile.typed.path).readText()))
             if (content.isBlank()) {
                 stopAndAlert(Alert.EmptyConfiguration)
                 return
@@ -238,7 +238,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
 
         val content = try {
             ProfileContent.assertUsable(profile)
-            ProfileContent.forCore(File(profile.typed.path).readText())
+            io.nekohasekai.sfa.v2tt.MeasurementAccess.attach(ProfileContent.forCore(File(profile.typed.path).readText()))
         } catch (_: Exception) {
             stopAndAlert(Alert.StartService, "订阅无效或已到期，请更新订阅")
             return
@@ -335,6 +335,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
     }
 
     private fun closeService() {
+        io.nekohasekai.sfa.v2tt.MeasurementAccess.clear()
         accountGuard?.cancel()
         runCatching {
             commandServer.closeService()

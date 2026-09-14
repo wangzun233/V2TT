@@ -1,4 +1,5 @@
 import type { DeviceManifest, DiagnosticItem, RouteMode } from './types'
+import type { MeasurementStatus } from './MeasurementPanel'
 import type { ClientSettings, ClientSettingKey, DesktopStatus, SubscriptionStatus, SubscriptionUpdate } from './services/desktopBridge'
 
 declare global {
@@ -18,6 +19,9 @@ declare global {
       runDiagnostics: () => Promise<DiagnosticItem[]>
       testNode: (payload: { id: 'vless' | 'tuic' }) => Promise<DiagnosticItem>
       exportReport: () => Promise<{ saved: boolean }>
+      startMeasurement: (payload: { id: 'direct' | 'vless' | 'tuic'; kind: 'latency' | 'speed' }) => Promise<MeasurementStatus>
+      measurementStatus: () => Promise<MeasurementStatus>
+      cancelMeasurement: () => Promise<void>
     }
   }
 }

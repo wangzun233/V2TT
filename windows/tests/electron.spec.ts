@@ -24,7 +24,7 @@ test('desktop shell requires a subscription and minimizes closing windows to tra
       methods: Object.keys(window.v2tt ?? {}).sort(),
     }))
     expect(bridgeShape.hasNode).toBe(false)
-    expect(bridgeShape.methods).toEqual(['connect', 'disconnect', 'exportReport', 'getManifest', 'getSettings', 'getStatus', 'getSubscription', 'refreshManifest', 'removeSubscription', 'runDiagnostics', 'setMode', 'setSetting', 'setSubscription', 'testNode'])
+    expect(bridgeShape.methods).toEqual(['cancelMeasurement', 'connect', 'disconnect', 'exportReport', 'getManifest', 'getSettings', 'getStatus', 'getSubscription', 'measurementStatus', 'refreshManifest', 'removeSubscription', 'runDiagnostics', 'setMode', 'setSetting', 'setSubscription', 'startMeasurement', 'testNode'])
     const initialSettings = await window.evaluate(() => window.v2tt?.getSettings())
     expect(initialSettings).toMatchObject({ startup: false, autoConnect: true, strictRoute: true, ipv6: false, lastMode: 'smart' })
     const updatedSettings = await window.evaluate(() => window.v2tt?.setSetting({ key: 'autoConnect', value: false }))

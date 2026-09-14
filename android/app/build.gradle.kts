@@ -181,6 +181,7 @@ android {
 }
 
 dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // libbox
     "playImplementation"(files("libs/libbox.aar"))
     "otherImplementation"(files("libs/libbox.aar"))

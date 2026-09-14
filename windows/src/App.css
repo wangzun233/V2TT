@@ -560,3 +560,12 @@ h2 { font-size: 14px; font-weight: 680; }
   border-radius: 0;
   box-shadow: none;
 }
+.measurement-section { padding: 20px 0; border-bottom: 1px solid #dbe5ef; }
+.measurement-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.measurement-controls select { padding: 8px; margin-left: 8px; border: 1px solid #cbd9e7; border-radius: 6px; background: white; color: #20334b; }
+.measurement-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.measurement-results dt { font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.measurement-results dt svg { width: 14px; height: 14px; }
+.measurement-results dd { margin: 6px 0 0; font-size: 18px; overflow-wrap: anywhere; }
+.measurement-confirm { padding: 12px 0; }
+.measurement-confirm button { margin-right: 8px; }

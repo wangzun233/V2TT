@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { MeasurementPanel } from './MeasurementPanel'
 import { fallbackManifest } from './data/fallbackManifest'
 import { buildSingBoxConfig } from './lib/singBoxConfig'
 import { loadManifest } from './services/controlPlane'
@@ -16,7 +17,7 @@ import type { AppRule, ConnectionState, DeviceManifest, DiagnosticItem, RouteMod
 type ViewId = 'connection' | 'rules' | 'lines' | 'diagnostics' | 'settings'
 type BooleanSettingKey = 'startup' | 'autoConnect' | 'strictRoute' | 'ipv6'
 
-const appVersion = '0.2.1'
+const appVersion = '0.2.4'
 
 const navItems = [
   { id: 'connection' as const, label: '连接', icon: RadioTower },
@@ -268,6 +269,7 @@ function DiagnosticsView({ diagnostics, running, onRun, onExport }: { diagnostic
   return (
     <div className="view">
       <header className="page-header compact"><div><h1>诊断中心</h1><p>订阅、线路与目标站</p></div><button type="button" className="primary-button" onClick={onRun} disabled={running}>{running ? <RefreshCw className="spin" /> : <Play />}{running ? '正在检查' : '开始诊断'}</button></header>
+      <MeasurementPanel />
       <section className="diagnostic-layout">
         <div className="diagnostic-list">{diagnostics.map((item, index) => <div className="diagnostic-row" key={item.id}><span className="step-number">{String(index + 1).padStart(2, '0')}</span><span className={'diagnostic-state ' + item.status}>{item.status === 'running' ? <RefreshCw className="spin" /> : item.status === 'warning' || item.status === 'error' ? <CircleAlert /> : item.status === 'idle' ? <CircleHelp /> : <Check />}</span><div><strong>{item.name}</strong><p>{item.detail}</p></div><span className={'result-label ' + item.status}>{item.status === 'idle' ? '未测试' : item.status === 'running' ? '检查中' : item.status === 'warning' ? '受限' : item.status === 'error' ? '失败' : '通过'}</span></div>)}</div>
         <aside className="diagnostic-summary"><Gauge /><span className="eyebrow">本次结果</span><h2>{running ? '正在检测' : !tested ? '尚未测试' : failures ? failures + ' 项失败' : warnings ? warnings + ' 项受限' : '检测已通过'}</h2><p>{tested ? 'HTTP 状态与线路错误已记录。API 未登录连通性测试不能验证 Codex 账号或会话。' : '暂无诊断结果'}</p><button type="button" className="text-button" disabled={running} onClick={onExport}>导出诊断报告 <FileDown /></button></aside>
