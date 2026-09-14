@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "windows": {
-    "version": "0.2.3",
-    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v2026.09.11-update-preview"
+    "version": "0.2.4",
+    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview"
   },
   "android": {
-    "version": "0.1.2",
-    "versionCode": 3,
-    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v2026.09.11-update-preview"
+    "version": "0.1.3",
+    "versionCode": 4,
+    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview"
   }
 }
