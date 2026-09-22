@@ -1,12 +1,13 @@
 const FEED = 'https://raw.githubusercontent.com/wangzun233/V2TT/main/updates/stable.json'
 const PREFIX = 'https://github.com/wangzun233/V2TT/releases/tag/'
 function version(value) {
-  if (typeof value !== 'string' || !/^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/.test(value)) throw new Error('更新版本格式无效')
-  return value.split('.').map(Number)
+  const match = typeof value === 'string' && /^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})(?:-rc\.([1-9]\d{0,2}))?$/.exec(value)
+  if (!match) throw new Error('更新版本格式无效')
+  return [...match.slice(1, 4).map(Number), match[4] ? Number(match[4]) : Infinity]
 }
 function newer(next, current) {
   const a = version(next), b = version(current)
-  for (let i = 0; i < 3; i++) { if (a[i] !== b[i]) return a[i] > b[i] }
+  for (let i = 0; i < 4; i++) { if (a[i] !== b[i]) return a[i] > b[i] }
   return false
 }
 function parseUpdate(text, current) {

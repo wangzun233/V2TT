@@ -6,11 +6,11 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 
 ## 下载与使用
 
-安装包位于本仓库的 [网络测速预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
+Windows 最新候选安装版见 [网络恢复候选版](https://github.com/wangzun233/V2TT/releases/tag/v0.2.5-rc.4)。Android 保持 [网络测速预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
 
 | 平台 | 本次版本 | 文件 | 说明 |
 | --- | --- | --- | --- |
-| Windows 10/11 x64 | 0.2.4 Preview | `V2TT-Client-Setup-0.2.4-Windows-x64.exe` | 安装程序，无数字签名 |
+| Windows 10/11 x64 | 0.2.5-rc.4 | `V2TT-Client-Setup-0.2.5-rc.4-Windows-x64.exe` | 候选安装版，无数字签名；长期断网问题尚未确认根治 |
 | Android 8.0+ ARM64 | 0.1.3 Preview | `V2TT-Android-0.1.3-arm64-v8a-debug.apk` | Debug 签名；本轮通过模拟器测试，仍需真机验证 |
 
 安装后自行导入管理员通过私密渠道发放的 **V2TT Client 专属 HTTPS JSON 订阅**。不是 Clash YAML、Hiddify 订阅或单节点分享链接。安装包不提供账号，不保证任何地区、运营商或目标网站可用。
@@ -35,6 +35,8 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 | 直连 | Windows 停止代理内核并恢复系统网络；Android 保留 VPN 服务但使用直连出口 |
 
 Windows 支持应用出口规则，规则会影响分流优先级；Android 当前提供应用代理/绕过选择，不是逐应用日常/游戏出口编辑器。国内规则是固定快照，不保证覆盖每一个国内服务。
+
+Windows 候选版中，显式应用规则优先于极速模式的 OpenAI 默认规则；极速 DNS 随 TUIC 出口。新增分层连通性检查和有限自动重连，不自动切换成直连。详见 [候选版说明](docs/RELEASE-0.2.5-rc.4.md)。稳定更新通道暂不推送该候选版，Android 未作改动。
 
 ## 目录
 

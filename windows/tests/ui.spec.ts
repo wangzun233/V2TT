@@ -39,7 +39,7 @@ test('main workflow remains functional across desktop views', async ({ page }) =
   await page.getByRole('button', { name: '全局' }).click()
   await expect(page.getByText('所有流量使用日常线路')).toBeVisible()
   await page.getByRole('button', { name: '极速' }).click()
-  await expect(page.getByText('OpenAI 使用 VLESS，其他国外流量使用 TUIC')).toBeVisible()
+  await expect(page.getByText('默认 TUIC；OpenAI 默认 VLESS，应用规则优先')).toBeVisible()
   await expect(page.getByText('DEMO TUIC', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '智能' }).click()
 

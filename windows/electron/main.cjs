@@ -6,7 +6,7 @@ const os = require('node:os')
 const crypto = require('node:crypto')
 const { pathToFileURL } = require('node:url')
 const { createStartup } = require('./startup.cjs')
-const { createRuntime } = require('./runtime.cjs')
+const { createRuntime, connectionChanged } = require('./runtime.cjs')
 const { DEFAULT_SETTINGS, normalizeSettings, validateMode, validateRules, validateSubscriptionUrl, validateManifest,
   assertActive, publicManifest, atomicWrite, readBounded, createQueue, redact } = require('./state.cjs')
 
@@ -31,6 +31,7 @@ let bundle = null
 let source = 'cache'
 let settings = structuredClone(DEFAULT_SETTINGS)
 let recoveryAttempts = 0
+let healthRecoveries = 0
 let recoverTimer = null
 let refreshTimer = null
 let expiryTimer = null
@@ -65,7 +66,7 @@ function log(event, details = {}) {
   try {
     fs.mkdirSync(directory, { recursive: true })
     const file = path.join(directory, event === 'CORE' ? 'sing-box.log' : 'startup.log')
-    if (fs.existsSync(file) && fs.statSync(file).size > 1024 * 1024) {
+    if (fs.existsSync(file) && fs.statSync(file).size > (event === 'CORE' ? 8 : 1) * 1024 * 1024) {
       fs.rmSync(`${file}.previous`, { force: true })
       fs.renameSync(file, `${file}.previous`)
     }
@@ -82,9 +83,19 @@ const runtime = createRuntime({ app, directory, log, onChange: updateTray, onUne
     void queue(async () => {
       if (quitting || !bundle) return
       runtime.setError(`正在恢复代理连接（${recoveryAttempts}/3）`)
-      await connect(settings.lastMode, false)
+      await connect(settings.lastMode, false, 'unexpected-core-exit')
     }).catch((error) => runtime.setError(error.message))
   }, 5000 * recoveryAttempts)
+}, onUnhealthy: (pid, result) => {
+  log('NETWORK_UNHEALTHY', { ...result, attempt: healthRecoveries })
+  if (quitting || !bundle || healthRecoveries >= 2) return
+  void queue(async () => {
+    // A queued manual stop/switch invalidates evidence from the previous core.
+    if (quitting || !bundle || !runtime.ownsProcess(pid) || healthRecoveries >= 2) return
+    healthRecoveries += 1
+    log('NETWORK_RECOVERY', { attempt: healthRecoveries })
+    await connect(settings.lastMode, false, 'network-health-failure')
+  }).catch((error) => { log('NETWORK_RECOVERY_FAILED', error); runtime.setError(error.message) })
 } })
 
 function showWindow() {
@@ -177,11 +188,13 @@ function publicAccount() {
   return { manifest: publicManifest(bundle.manifest), source }
 }
 
-async function connect(mode, resetRecovery = true) {
+async function connect(mode, resetRecovery = true, reason = 'user') {
   if (quitting) throw new Error('客户端正在退出')
   validateMode(mode)
   const manifest = mode === 'direct' ? bundle?.manifest : requireAccount()
+  log('CONNECT_REQUEST', { mode, reason, previousState: runtime.status().state })
   if (resetRecovery) recoveryAttempts = 0
+  if (reason === 'user') healthRecoveries = 0
   clearTimeout(recoverTimer)
   const result = await runtime.start(manifest, settings, mode)
   saveSettings({ ...settings, lastMode: mode })
@@ -192,10 +205,12 @@ async function refresh() {
   if (!bundle) throw new Error('请先导入订阅链接')
   try {
     const manifest = await requestManifest(bundle.url)
-    const changed = JSON.stringify(manifest.nodes) !== JSON.stringify(bundle.manifest.nodes) || JSON.stringify(manifest.routing) !== JSON.stringify(bundle.manifest.routing)
+    const active = runtime.status()
+    const changed = active.state === 'connected' && active.mode !== 'direct'
+      && connectionChanged(bundle.manifest, manifest, settings, active.mode)
     saveBundle({ url: bundle.url, manifest, fetchedAt: Date.now(), blocked: false })
     source = 'remote'
-    if (changed && runtime.status().state === 'connected' && runtime.status().mode !== 'direct') await connect(settings.lastMode)
+    if (changed) await connect(active.mode, true, 'subscription-config-changed')
     return publicAccount()
   } catch (error) {
     if (error.revoked) {
@@ -389,7 +404,7 @@ if (single) {
     }
     powerMonitor.on('resume', () => {
       if (runtime.status().state !== 'connected' || runtime.status().mode === 'direct') return
-      void queue(() => connect(settings.lastMode)).catch((error) => runtime.setError(error.message))
+      void queue(() => connect(settings.lastMode, true, 'system-resume')).catch((error) => runtime.setError(error.message))
     })
   }).catch((error) => { log('APP_READY_FAILED', error); dialog.showErrorBox('V2TT Client 启动失败', redact(error.message)); app.exit(1) })
 } else app.quit()

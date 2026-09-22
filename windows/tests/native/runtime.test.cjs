@@ -24,6 +24,14 @@ childProcess.spawn = (...args) => {
   else watchers.push(process)
   return process
 }
+const health = require('../../electron/health.cjs')
+const originalMonitor = health.createHealthMonitor
+let monitor
+health.createHealthMonitor = (options) => {
+  monitor = originalMonitor({ ...options, interval: 60000,
+    sample: async () => ({ healthy: false, controller: true, dns: false, web: false, proxy: true }) })
+  return monitor
+}
 const { createRuntime } = require('../../electron/runtime.cjs')
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -52,8 +60,11 @@ test('watchdog cleans up its designated child after owner death without killing 
 test('real core uses authenticated random ports, deletes plaintext, and stops only its owned process', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'v2tt-runtime-test-'))
   let unexpected = 0
+  const unhealthy = []
+  const logs = []
   const runtime = createRuntime({ app: { isPackaged: false, getAppPath: () => path.resolve('.') }, directory,
-    log: () => {}, onUnexpectedExit: () => { unexpected += 1 } })
+    log: (event, text) => logs.push({ event, text }), onUnexpectedExit: () => { unexpected += 1 },
+    onUnhealthy: (pid) => unhealthy.push(pid) })
   try {
     const starting = runtime.start(manifest, DEFAULT_SETTINGS, 'smart')
     let config
@@ -72,7 +83,19 @@ test('real core uses authenticated random ports, deletes plaintext, and stops on
     assert.equal((await fetch(api, { headers: { Authorization: `Bearer ${controller.secret}` } })).status, 200)
     assert.equal((await runtime.traffic()).downloadBytes, 0)
     const firstCore = core
+    await monitor.tick(); await monitor.tick()
+    assert.equal(unhealthy.length, 0)
+    await monitor.tick()
+    assert.deepEqual(unhealthy, [firstCore.pid])
+    assert.match((await runtime.traffic()).error, /网络/)
+    const fullChunk = 'important-error\n' + 'x'.repeat(4096)
+    core.stderr.emit('data', Buffer.from(fullChunk))
+    assert.ok(logs.some((line) => line.event === 'CORE' && line.text === fullChunk))
+    assert.equal(runtime.ownsProcess(firstCore.pid), true)
     await runtime.stop()
+    await monitor.tick()
+    assert.equal(unhealthy.length, 1)
+    assert.equal(runtime.ownsProcess(firstCore.pid), false)
     assert.notEqual(firstCore.exitCode, null)
     assert.equal(runtime.status().state, 'disconnected')
     assert.equal(unexpected, 0)

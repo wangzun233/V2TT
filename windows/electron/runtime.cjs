@@ -1,5 +1,5 @@
 const { spawn, execFile } = require('node:child_process')
-const { promisify } = require('node:util')
+const { promisify, isDeepStrictEqual } = require('node:util')
 const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -7,11 +7,17 @@ const { performance } = require('node:perf_hooks')
 const { buildSingBoxConfig } = require('./generated/config.cjs')
 const { freePort, probe } = require('./network.cjs')
 const measurement = require('./measurement.cjs')
+const { createHealthMonitor, sampleHealth } = require('./health.cjs')
 const { validateMode, assertActive, atomicWrite, redact } = require('./state.cjs')
 const run = promisify(execFile)
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
+function connectionChanged(previous, next, settings, mode) {
+  const options = { ...settings, mode }
+  return !isDeepStrictEqual(buildSingBoxConfig(previous, options), buildSingBoxConfig(next, options))
+}
+
+function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhealthy }) {
   const binary = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'sing-box.exe') : path.join(app.getAppPath(), 'resources', 'bin', 'sing-box.exe')
   const rules = app.isPackaged ? path.join(process.resourcesPath, 'rules') : path.join(app.getAppPath(), 'resources', 'rules')
   const configPath = path.join(directory, 'config.json')
@@ -22,6 +28,8 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
   let failureCount = 0
   let sampleRequest = null
   let report = []
+  let healthMonitor = null
+  let healthError = ''
   const meter = measurement.createMeasurement()
   let status = { state: 'disconnected', mode: 'smart', downloadBytes: 0, uploadBytes: 0, downloadRate: 0, uploadRate: 0, error: '' }
   const update = (next) => { status = { ...status, ...next }; onChange?.(status); return { ...status } }
@@ -30,6 +38,9 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
   })
 
   async function stop() {
+    healthMonitor?.stop()
+    healthMonitor = null
+    healthError = ''
     meter.cancel()
     const current = child
     if (current?.pid && current.exitCode === null) {
@@ -78,11 +89,13 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
       child = core
       let recentError = ''
       core.stdout.on('data', (chunk) => log('CORE', chunk.toString('utf8')))
-      core.stderr.on('data', (chunk) => { recentError = chunk.toString('utf8').slice(-1500); log('CORE', recentError) })
+      core.stderr.on('data', (chunk) => { const text = chunk.toString('utf8'); recentError = text.slice(-1500); log('CORE', text) })
       core.once('error', (error) => { recentError = error.message; log('CORE_SPAWN_ERROR', error.message) })
       core.once('exit', (code) => {
-        log('CORE_EXIT', { code })
+        log('CORE_EXIT', { code, intentional: stopping.has(core), mode, uptimeMs: Date.now() - startedAt })
         if (child !== core) return
+        healthMonitor?.stop()
+        healthMonitor = null
         meter.cancel()
         child = null
         controller = null
@@ -110,6 +123,25 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
       fs.rmSync(configPath, { force: true })
       failureCount = 0
       sample = null
+      const activeController = controller
+      healthMonitor = createHealthMonitor({
+        sample: (signal) => sampleHealth({ signal,
+          control: async () => (await controllerFetch('/version')).ok,
+          port: mode === 'fast' ? activeController.gamePort : activeController.dailyPort,
+          password: activeController.password }),
+        onSample(result) {
+          if (child !== core) return
+          log('NETWORK_HEALTH', { mode, uptimeMs: Date.now() - startedAt, ...result })
+          healthError = result.healthy ? '' : '网络连通性异常，正在复查'
+          update({ error: healthError })
+        },
+        onFailure(result) {
+          if (child !== core) return
+          healthError = '连续检测到网络异常，请检查网络或重新连接'
+          update({ error: healthError })
+          onUnhealthy?.(core.pid, result)
+        },
+      })
       return update({ state: 'connected', error: '', downloadBytes: 0, uploadBytes: 0, downloadRate: 0, uploadRate: 0 })
     } catch (error) {
       await stop().catch((stopError) => log('STOP_ERROR', stopError.message))
@@ -134,7 +166,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
       const rates = elapsed > 0 ? { downloadRate: Math.max(0, (downloadBytes - sample.down) / elapsed), uploadRate: Math.max(0, (uploadBytes - sample.up) / elapsed) } : { downloadRate: 0, uploadRate: 0 }
       sample = { time: now, down: downloadBytes, up: uploadBytes }
       failureCount = 0
-      return update({ downloadBytes, uploadBytes, ...rates, error: '' })
+      return update({ downloadBytes, uploadBytes, ...rates, error: healthError })
     } catch {
       if (child !== current) return { ...status }
       failureCount += 1
@@ -165,6 +197,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
         port: id === 'tuic' ? controller.gamePort : id === 'direct' ? controller.directPort : controller.dailyPort, password: controller.password })
     },
     status: () => ({ ...status }),
+    ownsProcess: (pid) => child?.pid === pid && child.exitCode === null,
     setMode: (mode) => update({ mode }),
     setError: (error) => update({ error }),
     report: () => report,
@@ -191,4 +224,4 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit }) {
   }
 }
 
-module.exports = { createRuntime }
+module.exports = { createRuntime, connectionChanged }

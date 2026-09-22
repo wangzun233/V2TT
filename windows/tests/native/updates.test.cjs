@@ -7,6 +7,12 @@ test('update versions compare numerically and never downgrade', () => {
   assert.equal(newer('0.2.3', '0.2.3'), false)
   assert.equal(newer('0.1.9', '0.2.3'), false)
   assert.throws(() => newer('0.2.3-beta', '0.2.3'))
+  assert.equal(newer('0.2.4', '0.2.5-rc.4'), false)
+  assert.equal(newer('0.2.5', '0.2.5-rc.4'), true)
+  assert.equal(newer('0.2.5-rc.4', '0.2.5'), false)
+  assert.equal(newer('0.2.5-rc.4', '0.2.5-rc.3'), true)
+  assert.equal(newer('0.2.5-rc.4', '0.2.5-rc.4'), false)
+  assert.throws(() => newer('0.2.5-rc.04', '0.2.4'))
 })
 test('only this repository release pages are allowed', () => {
   assert.equal(parseUpdate(JSON.stringify(good), '0.2.3').version, '0.2.4')

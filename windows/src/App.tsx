@@ -175,7 +175,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
       <header className="page-header connection-header">
         <div>
           <div className="status-title"><span className={`status-dot ${state}`} /><h1>{state === 'connected' ? '已连接' : state === 'connecting' ? '正在连接' : '未连接'}</h1></div>
-          <p>{mode === 'smart' ? '国内直连，国外使用兼容线路' : mode === 'fast' ? 'OpenAI 使用 VLESS，其他国外流量使用 TUIC' : mode === 'global' ? '所有流量使用日常线路' : '所有流量绕过代理'}</p>
+          <p>{mode === 'smart' ? '国内直连，国外使用兼容线路' : mode === 'fast' ? '默认 TUIC；OpenAI 默认 VLESS，应用规则优先' : mode === 'global' ? '所有流量使用日常线路' : '所有流量绕过代理'}</p>
         </div>
         <button type="button" className={`power-button ${connected ? 'is-connected' : ''}`} onClick={onToggleConnection} disabled={state === 'connecting'} aria-label={connected ? '断开连接' : '开始连接'} title={connected ? '断开连接' : '开始连接'}>
           {state === 'connecting' ? <RefreshCw className="spin" /> : <Power />}

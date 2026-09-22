@@ -19,6 +19,8 @@ type JsonRecord = Record<string, unknown>
 const protectedDailyProcesses = ['Codex.exe', 'ChatGPT.exe', 'com.vortex.helper.exe']
 const openAiDomains = ['openai.com', 'chatgpt.com', 'oaistatic.com', 'oaiusercontent.com']
 
+const processPattern = (name: string) => String.raw`(?i)(^|[\\/])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
+
 function findNode<T extends VlessNode | TuicNode>(
   manifest: DeviceManifest,
   id: string,
@@ -99,12 +101,6 @@ export function buildSingBoxConfig(
   const modeRules: JsonRecord[] = []
 
   if (options.mode === 'smart' || options.mode === 'fast') {
-    if (options.mode === 'fast') {
-      modeRules.push(
-        { domain_suffix: openAiDomains, outbound: 'daily-vless' },
-        { process_name: protectedDailyProcesses, outbound: 'daily-vless' },
-      )
-    }
     const processRoutes: Array<[AppRule['target'], string]> = [
       ['game', 'game-tuic'],
       ['daily', 'daily-vless'],
@@ -113,8 +109,15 @@ export function buildSingBoxConfig(
     for (const [target, outbound] of processRoutes) {
       const processNames = processes(target)
       if (processNames.length) {
-        modeRules.push({ process_name: processNames, outbound })
+        modeRules.push({ process_path_regex: processNames.map(processPattern), outbound })
       }
+    }
+    // Explicit application choices take precedence over compatibility defaults.
+    if (options.mode === 'fast') {
+      modeRules.push(
+        { domain_suffix: openAiDomains, outbound: 'daily-vless' },
+        { process_path_regex: protectedDailyProcesses.map(processPattern), outbound: 'daily-vless' },
+      )
     }
     modeRules.push(
       { rule_set: ['geosite-cn', 'geoip-cn'], outbound: 'direct' },
@@ -139,7 +142,7 @@ export function buildSingBoxConfig(
           tag: 'secure-dns',
           server: '1.1.1.1',
           server_port: 853,
-          detour: 'daily-vless',
+          detour: modeFinal,
         },
         { type: 'local', tag: 'local-dns' },
       ],
@@ -177,6 +180,8 @@ export function buildSingBoxConfig(
       rules: [
         { action: 'sniff' },
         { protocol: 'dns', action: 'hijack-dns' },
+        // Never send non-DNS traffic back into our own virtual subnet.
+        { ip_cidr: ['172.19.0.0/30', 'fdfe:dcba:9876::/126'], action: 'reject', method: 'drop' },
         ...modeRules,
       ],
       final: modeFinal,

@@ -15,6 +15,18 @@ const gameRule: AppRule = {
 }
 
 describe('buildSingBoxConfig', () => {
+  it('blocks virtual-subnet recirculation after DNS hijack and before application routes', () => {
+    const config = buildSingBoxConfig(fallbackManifest, {
+      mode: 'fast', appRules: [gameRule], strictRoute: true, ipv6: true,
+    })
+    const { rules } = config.route as { rules: Array<Record<string, unknown>> }
+    const dns = rules.findIndex(rule => rule.action === 'hijack-dns')
+    const guard = rules.findIndex(rule => Array.isArray(rule.ip_cidr))
+    const application = rules.findIndex(rule => Array.isArray(rule.process_path_regex))
+    expect(guard).toBeGreaterThan(dns)
+    expect(guard).toBeLessThan(application)
+    expect(rules[guard]).toEqual({ ip_cidr: ['172.19.0.0/30', 'fdfe:dcba:9876::/126'], action: 'reject', method: 'drop' })
+  })
   it('uses reject actions instead of removed special outbounds', () => {
     const config = buildSingBoxConfig(fallbackManifest, {
       mode: 'global', appRules: [], strictRoute: true, ipv6: false,
@@ -34,7 +46,7 @@ describe('buildSingBoxConfig', () => {
     })
     const route = config.route as { rules: Array<Record<string, unknown>> }
     expect(route.rules).toContainEqual({
-      process_name: ['game.exe'],
+      process_path_regex: [String.raw`(?i)(^|[\\/])game\.exe$`],
       outbound: 'game-tuic',
     })
     expect(route.rules).toContainEqual({
@@ -73,10 +85,56 @@ describe('buildSingBoxConfig', () => {
       outbound: 'daily-vless',
     })
     expect(route.rules).toContainEqual({
-      process_name: ['Codex.exe', 'ChatGPT.exe', 'com.vortex.helper.exe'],
+      process_path_regex: [String.raw`(?i)(^|[\\/])Codex\.exe$`, String.raw`(?i)(^|[\\/])ChatGPT\.exe$`, String.raw`(?i)(^|[\\/])com\.vortex\.helper\.exe$`],
       outbound: 'daily-vless',
     })
     expect(route.rules).not.toContainEqual({ network: 'udp', port: 443, action: 'reject', method: 'drop' })
+  })
+
+  it.each(['game', 'direct'] as const)('lets an explicit %s application rule override OpenAI defaults', (target) => {
+    const config = buildSingBoxConfig(fallbackManifest, {
+      mode: 'fast', strictRoute: true, ipv6: false,
+      appRules: [{ id: 'codex', name: 'Codex', executable: 'Codex.exe', target, enabled: true }],
+    })
+    const { rules } = config.route as { rules: Array<Record<string, unknown>> }
+    const application = rules.findIndex(rule => Array.isArray(rule.process_path_regex) && rule.process_path_regex.length === 1 && rule.process_path_regex[0] === String.raw`(?i)(^|[\\/])Codex\.exe$`)
+    const compatibility = rules.findIndex(rule => Array.isArray(rule.domain_suffix) && rule.domain_suffix.includes('openai.com'))
+    expect(application).toBeGreaterThanOrEqual(0)
+    expect(application).toBeLessThan(compatibility)
+    expect(rules[application].outbound).toBe(target === 'game' ? 'game-tuic' : 'direct')
+  })
+
+  it.each(['smart', 'fast', 'global', 'direct'] as const)('keeps DNS consistent with %s mode without changing domestic DNS', (mode) => {
+    const config = buildSingBoxConfig(fallbackManifest, { mode, appRules: [], strictRoute: true, ipv6: false })
+    const dns = config.dns as { servers: Array<Record<string, unknown>>; rules: unknown[]; final: string }
+    expect(dns.servers[0].detour).toBe(mode === 'fast' ? 'game-tuic' : mode === 'direct' ? 'direct' : 'daily-vless')
+    if (mode === 'fast' || mode === 'smart') expect(dns.rules).toContainEqual({ rule_set: 'geosite-cn', server: 'local-dns' })
+    if (mode === 'direct') expect(dns.final).toBe('local-dns')
+  })
+
+  it('disabled application overrides leave compatibility defaults intact', () => {
+    const config = buildSingBoxConfig(fallbackManifest, {
+      mode: 'fast', strictRoute: true, ipv6: false,
+      appRules: [{ id: 'codex', name: 'Codex', executable: 'Codex.exe', target: 'game', enabled: false }],
+    })
+    const { rules } = config.route as { rules: Array<Record<string, unknown>> }
+    expect(rules).not.toContainEqual({ process_path_regex: [String.raw`(?i)(^|[\\/])Codex\.exe$`], outbound: 'game-tuic' })
+    expect(rules).toContainEqual({ process_path_regex: [String.raw`(?i)(^|[\\/])Codex\.exe$`, String.raw`(?i)(^|[\\/])ChatGPT\.exe$`, String.raw`(?i)(^|[\\/])com\.vortex\.helper\.exe$`], outbound: 'daily-vless' })
+  })
+
+  it('escapes process names and matches Windows casing without matching a different executable', () => {
+    const config = buildSingBoxConfig(fallbackManifest, {
+      mode: 'fast', strictRoute: true, ipv6: false,
+      appRules: [{ ...gameRule, executable: 'Code(x)+.exe' }],
+    })
+    const { rules } = config.route as { rules: Array<Record<string, unknown>> }
+    const expression = (rules.find(rule => rule.outbound === 'game-tuic')!.process_path_regex as string[])[0]
+    expect(expression.startsWith('(?i)')).toBe(true)
+    const regex = new RegExp(expression.slice(4), 'i')
+    expect(regex.test('code(X)+.EXE')).toBe(true)
+    expect(regex.test('C:\\Apps\\code(X)+.EXE')).toBe(true)
+    expect(regex.test('Codex.exe')).toBe(false)
+    expect(regex.test('Code(x)+.exe.bak')).toBe(false)
   })
 
   it('fails clearly when a required node is missing', () => {
