@@ -22,7 +22,7 @@
 4. 最后更新 `updates/stable.json` 并推送 main。索引中的两个 releaseUrl 必须是已经存在的本仓库 Release 页面，不能写其他网站或安装器路径。
 5. 使用旧版支持更新的客户端检查，确认新版本弹窗；再检查最新版不会重复报新版本。
 
-Windows 当前正式版为 `v0.2.6`，安装包及校验附件已上传并核对大小与 SHA256，详见 [发布说明](RELEASE-0.2.6.md)。Android 保持 `v2026.09.14-measurement-preview` 的 0.1.3（versionCode 4），本次不更新 APK。没有完成第 3、4 步，线上提醒不会生效。不要先发布索引再上传包。
+Windows 当前正式版为 `v0.2.7`，修复侧栏版本号显示；安装包及校验附件已上传并核对大小与 SHA256，详见 [发布说明](RELEASE-0.2.7.md)。Android 保持 `v2026.09.14-measurement-preview` 的 0.1.3（versionCode 4），本次不更新 APK。没有完成第 3、4 步，线上提醒不会生效。不要先发布索引再上传包。
 
 版本按三段数字比较，拒绝格式错误、跨仓库地址和降级；Android 同时要求 versionCode 增加。请求有超时、16 KiB 内容上限和 HTTPS 校验，不携带 GitHub 凭据。GitHub 暂时无法访问时可稍后手动重试，不会切换代理规则。
 

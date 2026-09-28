@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "windows": {
-    "version": "0.2.6",
-    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v0.2.6"
+    "version": "0.2.7",
+    "releaseUrl": "https://github.com/wangzun233/V2TT/releases/tag/v0.2.7"
   },
   "android": {
     "version": "0.1.3",
