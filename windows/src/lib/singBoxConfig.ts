@@ -21,6 +21,17 @@ const openAiDomains = ['openai.com', 'chatgpt.com', 'oaistatic.com', 'oaiusercon
 
 const processPattern = (name: string) => String.raw`(?i)(^|[\\/])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
 
+export function applicationOutbound(executable: string, options: ConfigOptions): string {
+  if (options.mode === 'direct') return 'direct'
+  if (options.mode === 'global') return 'daily-vless'
+  const diablo = executable.toLowerCase() === 'diablo iv.exe'
+  const rule = options.appRules.find(r => r.enabled && r.executable.toLowerCase() === executable.toLowerCase())
+  if (rule) return rule.target === 'direct' ? 'direct' : rule.target === 'daily' ? 'daily-vless' : options.mode === 'game' && diablo ? 'diablo-tuic' : 'game-tuic'
+  if (options.mode === 'game' && diablo) return 'diablo-tuic'
+  if (options.mode === 'fast' && !protectedDailyProcesses.some(p => p.toLowerCase() === executable.toLowerCase())) return 'game-tuic'
+  return 'daily-vless'
+}
+
 function findNode<T extends VlessNode | TuicNode>(
   manifest: DeviceManifest,
   id: string,
@@ -99,8 +110,15 @@ export function buildSingBoxConfig(
       ? 'game-tuic'
       : 'daily-vless'
   const modeRules: JsonRecord[] = []
+  const gameMode = options.mode === 'game'
+  const split = options.mode === 'smart' || options.mode === 'fast' || gameMode
+  const earlyRules: JsonRecord[] = gameMode ? [
+    { port: 53, action: 'hijack-dns' },
+    { ip_cidr: ['172.19.0.0/30', 'fdfe:dcba:9876::/126'], action: 'reject', method: 'drop' },
+    { process_path_regex: [processPattern('Diablo IV.exe')], outbound: applicationOutbound('Diablo IV.exe', options) },
+  ] : []
 
-  if (options.mode === 'smart' || options.mode === 'fast') {
+  if (split) {
     const processRoutes: Array<[AppRule['target'], string]> = [
       ['game', 'game-tuic'],
       ['daily', 'daily-vless'],
@@ -124,7 +142,7 @@ export function buildSingBoxConfig(
       { ip_is_private: true, outbound: 'direct' },
       { domain_suffix: ['.cn'], outbound: 'direct' },
     )
-    if (options.mode === 'smart') {
+    if (options.mode === 'smart' || gameMode) {
       // Browsers fall back to TCP when QUIC is dropped. This avoids tunnelling
       // web UDP/443 over the WebSocket daily route; game rules above keep TUIC.
       modeRules.splice(modeRules.length - 2, 0, { network: 'udp', port: 443, action: 'reject', method: 'drop' })
@@ -142,11 +160,11 @@ export function buildSingBoxConfig(
           tag: 'secure-dns',
           server: '1.1.1.1',
           server_port: 853,
-          detour: modeFinal,
+          detour: gameMode ? 'game-tuic' : modeFinal,
         },
         { type: 'local', tag: 'local-dns' },
       ],
-      rules: options.mode === 'smart' || options.mode === 'fast'
+      rules: split
         ? [{ rule_set: 'geosite-cn', server: 'local-dns' }]
         : [],
       final: options.mode === 'direct' ? 'local-dns' : 'secure-dns',
@@ -161,23 +179,26 @@ export function buildSingBoxConfig(
         auto_route: true,
         strict_route: options.strictRoute,
         stack: 'mixed',
+        ...(gameMode ? { mtu: 1400 } : {}),
       },
     ],
     outbounds: [
       vlessOutbound(daily),
       tuicOutbound(game),
+      ...(gameMode ? [{ ...tuicOutbound(game), tag: 'diablo-tuic', udp_relay_mode: 'native' }] : []),
       { type: 'direct', tag: 'direct' },
     ],
     route: {
       auto_detect_interface: true,
       default_domain_resolver: 'local-dns',
-      rule_set: options.mode === 'smart' || options.mode === 'fast'
+      rule_set: split
         ? [
             { type: 'local', tag: 'geosite-cn', format: 'binary', path: ruleSetPath('geosite-cn') },
             { type: 'local', tag: 'geoip-cn', format: 'binary', path: ruleSetPath('geoip-cn') },
           ]
         : [],
       rules: [
+        ...earlyRules,
         { action: 'sniff' },
         { protocol: 'dns', action: 'hijack-dns' },
         // Never send non-DNS traffic back into our own virtual subnet.

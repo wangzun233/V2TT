@@ -4,7 +4,7 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 const { performance } = require('node:perf_hooks')
-const { buildSingBoxConfig } = require('./generated/config.cjs')
+const { buildSingBoxConfig, applicationOutbound } = require('./generated/config.cjs')
 const { freePort, probe } = require('./network.cjs')
 const measurement = require('./measurement.cjs')
 const { createHealthMonitor, sampleHealth } = require('./health.cjs')
@@ -30,6 +30,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
   let report = []
   let healthMonitor = null
   let healthError = ''
+  let activeOptions = null
   const meter = measurement.createMeasurement()
   let status = { state: 'disconnected', mode: 'smart', downloadBytes: 0, uploadBytes: 0, downloadRate: 0, uploadRate: 0, error: '' }
   const update = (next) => { status = { ...status, ...next }; onChange?.(status); return { ...status } }
@@ -73,12 +74,13 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
       if (!fs.existsSync(binary)) throw new Error('代理内核文件缺失，请重新安装并检查安全软件的隔离记录')
       for (const name of ['geoip-cn', 'geosite-cn']) if (!fs.existsSync(path.join(rules, `${name}.srs`))) throw new Error('国内分流规则缺失，请重新安装')
       const ports = new Set()
-      while (ports.size < 4) ports.add(await freePort())
-      const [port, dailyPort, gamePort, directPort] = [...ports]
-      controller = { port, dailyPort, gamePort, directPort, secret: crypto.randomBytes(24).toString('hex'), password: crypto.randomBytes(24).toString('hex') }
+      while (ports.size < 5) ports.add(await freePort())
+      const [port, dailyPort, gamePort, directPort, sessionPort] = [...ports]
+      controller = { port, dailyPort, gamePort, directPort, sessionPort, secret: crypto.randomBytes(24).toString('hex'), password: crypto.randomBytes(24).toString('hex') }
+      activeOptions = structuredClone({ ...settings, mode })
       const config = buildSingBoxConfig(manifest, { ...settings, mode, ruleSetDirectory: rules })
       config.experimental.clash_api = { external_controller: `127.0.0.1:${port}`, secret: controller.secret }
-      for (const [role, listenPort, outbound] of [['daily', dailyPort, 'daily-vless'], ['game', gamePort, 'game-tuic'], ['direct', directPort, 'direct']]) {
+      for (const [role, listenPort, outbound] of [['daily', dailyPort, 'daily-vless'], ['game', gamePort, 'game-tuic'], ['direct', directPort, 'direct'], ['session', sessionPort, mode === 'game' ? 'diablo-tuic' : 'game-tuic']]) {
         config.inbounds.push({ type: 'mixed', tag: `probe-${role}`, listen: '127.0.0.1', listen_port: listenPort, users: [{ username: 'probe', password: controller.password }] })
         config.route.rules.unshift({ inbound: [`probe-${role}`], outbound })
       }
@@ -137,7 +139,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
         },
         onFailure(result) {
           if (child !== core) return
-          healthError = '连续检测到网络异常，请检查网络或重新连接'
+          healthError = mode === 'game' ? '网络检测异常；游戏模式保留当前连接，请按需手动重连' : '连续检测到网络异常，请检查网络或重新连接'
           update({ error: healthError })
           onUnhealthy?.(core.pid, result)
         },
@@ -176,7 +178,7 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
 
   async function testNode(id) {
     if (!controller || !child || status.state !== 'connected') return { id, name: id === 'vless' ? '日常线路' : '游戏线路', status: 'idle', detail: '请先连接代理线路' }
-    const endpoint = id === 'vless' ? controller.dailyPort : controller.gamePort
+    const endpoint = id === 'vless' ? controller.dailyPort : status.mode === 'game' ? controller.sessionPort : controller.gamePort
     try {
       const result = await probe('https://www.gstatic.com/generate_204', endpoint, controller.password)
       return { id, name: id === 'vless' ? '日常线路' : '游戏线路', status: result.httpStatus === 204 ? 'success' : 'warning',
@@ -190,11 +192,12 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
     measurementStatus: meter.status,
     startMeasurement(manifest, id, kind) {
       if (!controller || !child || status.state !== 'connected') throw new Error('请先连接代理后测试')
+      if (status.mode === 'game' && kind !== 'latency') throw new Error('游戏模式暂不进行大流量测速，请切换模式后测试')
       const daily = manifest.nodes.find((n) => n.type === 'vless')
       const game = manifest.nodes.find((n) => n.type === 'tuic')
       return meter.start({ id, kind, hostname: game.server, servername: daily.tls.server_name,
         token: id === 'tuic' ? game.uuid : daily.uuid,
-        port: id === 'tuic' ? controller.gamePort : id === 'direct' ? controller.directPort : controller.dailyPort, password: controller.password })
+        port: id === 'tuic' ? (status.mode === 'game' ? controller.sessionPort : controller.gamePort) : id === 'direct' ? controller.directPort : controller.dailyPort, password: controller.password })
     },
     status: () => ({ ...status }),
     ownsProcess: (pid) => child?.pid === pid && child.exitCode === null,
@@ -212,10 +215,13 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
       for (const [id, name, url] of [['chatgpt', 'ChatGPT 网页', 'https://chatgpt.com/'], ['codex', 'OpenAI API 连通性', 'https://api.openai.com/v1/models']]) {
         if (!controller || !child) { results.push({ id, name, status: 'idle', detail: '请先连接代理线路' }); continue }
         try {
-          const result = await probe(url, controller.dailyPort, controller.password)
+          const outbound = applicationOutbound(id === 'codex' ? 'Codex.exe' : 'ChatGPT.exe', activeOptions)
+          const route = outbound === 'game-tuic' ? 'TUIC' : outbound === 'direct' ? 'DIRECT' : 'VLESS'
+          const port = outbound === 'game-tuic' ? controller.gamePort : outbound === 'direct' ? controller.directPort : controller.dailyPort
+          const result = await probe(url, port, controller.password)
           const reachable = result.httpStatus < 400 || (id === 'codex' && result.httpStatus === 401)
           results.push({ id, name, status: reachable ? 'success' : 'warning', ...result,
-            detail: id === 'codex' && result.httpStatus === 401 ? 'API TLS 可达，未登录测试不代表 Codex 会话可用' : `VLESS 出口 HTTP ${result.httpStatus}${result.httpStatus === 403 ? '，目标站拒绝访问' : ''}` })
+            detail: `${route} 应用规则探测 HTTP ${result.httpStatus}；${id === 'codex' ? '不代表 Codex 登录会话可用' : '不代表浏览器实际出口'}${result.httpStatus === 403 ? '，目标站拒绝访问' : ''}` })
         } catch (error) { results.push({ id, name, status: 'error', detail: redact(error.message) }) }
       }
       report = results

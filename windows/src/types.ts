@@ -1,4 +1,4 @@
-export type RouteMode = 'smart' | 'fast' | 'global' | 'direct'
+export type RouteMode = 'smart' | 'fast' | 'game' | 'global' | 'direct'
 export type RouteTarget = 'daily' | 'game' | 'direct'
 export type ConnectionState = 'connected' | 'connecting' | 'disconnected'
 

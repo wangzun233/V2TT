@@ -40,7 +40,7 @@ const initialDiagnostics: DiagnosticItem[] = [
   { id: 'codex', name: 'OpenAI API 连通性', detail: '未登录 API 连通性测试', status: 'idle' },
 ]
 
-const modeLabels: Record<RouteMode, string> = { smart: '智能', fast: '极速', global: '全局', direct: '直连' }
+const modeLabels: Record<RouteMode, string> = { smart: '智能', fast: '极速', game: '游戏', global: '全局', direct: '直连' }
 const targetLabels: Record<RouteTarget, string> = { daily: '日常线路', game: '游戏线路', direct: '直连' }
 function chartPath(values: number[], width: number, height: number, max: number) {
   return values.map((value, index) => {
@@ -175,7 +175,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
       <header className="page-header connection-header">
         <div>
           <div className="status-title"><span className={`status-dot ${state}`} /><h1>{state === 'connected' ? '已连接' : state === 'connecting' ? '正在连接' : '未连接'}</h1></div>
-          <p>{mode === 'smart' ? '国内直连，国外使用兼容线路' : mode === 'fast' ? '默认 TUIC；OpenAI 默认 VLESS，应用规则优先' : mode === 'global' ? '所有流量使用日常线路' : '所有流量绕过代理'}</p>
+          <p>{mode === 'smart' ? '国内直连，国外使用兼容线路' : mode === 'fast' ? '默认 TUIC；OpenAI 默认 VLESS，应用规则优先' : mode === 'game' ? '暗黑 IV · 独立 TUIC · 国内直连' : mode === 'global' ? '所有流量使用日常线路' : '所有流量绕过代理'}</p>
         </div>
         <button type="button" className={`power-button ${connected ? 'is-connected' : ''}`} onClick={onToggleConnection} disabled={state === 'connecting'} aria-label={connected ? '断开连接' : '开始连接'} title={connected ? '断开连接' : '开始连接'}>
           {state === 'connecting' ? <RefreshCw className="spin" /> : <Power />}
@@ -190,11 +190,11 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
       <section className={`route-band ${connected ? "" : "inactive"}`} aria-label="当前网络路径">
         <div className="route-flow">
           <div className="route-node"><Laptop /><span>本机</span></div><div className="route-link"><span><Check /></span></div>
-          <div className="route-node"><ShieldCheck /><span>{mode === 'direct' ? '直连' : mode === 'smart' ? '智能分流' : mode === 'fast' ? '极速分流' : 'VLESS'}</span></div><div className="route-link"><span><Check /></span></div>
-          <div className="route-node"><Server /><span>{mode === 'direct' ? '本地网络' : mode === 'fast' ? game?.name : daily?.name}</span></div><div className="route-link"><span><Check /></span></div>
+          <div className="route-node"><ShieldCheck /><span>{mode === 'direct' ? '直连' : mode === 'smart' ? '智能分流' : mode === 'fast' ? '极速分流' : mode === 'game' ? '游戏分流' : 'VLESS'}</span></div><div className="route-link"><span><Check /></span></div>
+          <div className="route-node"><Server /><span>{mode === 'direct' ? '本地网络' : mode === 'fast' || mode === 'game' ? game?.name : daily?.name}</span></div><div className="route-link"><span><Check /></span></div>
           <div className="route-node"><Globe2 /><span>Internet</span></div>
         </div>
-        <div className="network-metrics"><div><span>内核</span><strong>{mode === 'direct' ? '已停用' : connected ? '运行中' : '未运行'}</strong></div><div><span>出口</span><strong>{mode === 'direct' ? '本机' : mode === 'global' ? 'VLESS' : mode === 'fast' ? 'TUIC' : '自动'}</strong></div><div><span>模式</span><strong>{modeLabels[mode]}</strong></div></div>
+        <div className="network-metrics"><div><span>内核</span><strong>{mode === 'direct' ? '已停用' : connected ? '运行中' : '未运行'}</strong></div><div><span>出口</span><strong>{mode === 'direct' ? '本机' : mode === 'global' ? 'VLESS' : mode === 'fast' ? 'TUIC' : mode === 'game' ? '独立 TUIC' : '自动'}</strong></div><div><span>模式</span><strong>{modeLabels[mode]}</strong></div></div>
       </section>
 
       <div className="connection-grid">

@@ -4,7 +4,7 @@ import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fallbackManifest } from '../data/fallbackManifest'
 import type { AppRule } from '../types'
-import { buildSingBoxConfig } from './singBoxConfig'
+import { applicationOutbound, buildSingBoxConfig } from './singBoxConfig'
 
 const gameRule: AppRule = {
   id: 'game',
@@ -15,6 +15,40 @@ const gameRule: AppRule = {
 }
 
 describe('buildSingBoxConfig', () => {
+  it('isolates Diablo traffic before sniff without capturing the launcher or changing domestic rules', () => {
+    const config = buildSingBoxConfig(fallbackManifest, { mode: 'game', appRules: [], strictRoute: true, ipv6: false })
+    const { rules, final } = config.route as { rules: Array<Record<string, unknown>>; final: string }
+    const diablo = rules.findIndex(r => r.outbound === 'diablo-tuic')
+    expect(diablo).toBeLessThan(rules.findIndex(r => r.action === 'sniff'))
+    expect(rules[0]).toEqual({ port: 53, action: 'hijack-dns' })
+    expect(rules[diablo].network).toBeUndefined()
+    expect(final).toBe('daily-vless')
+    expect(JSON.stringify(rules)).not.toContain('Battle.net')
+    expect(rules).toContainEqual({ rule_set: ['geosite-cn', 'geoip-cn'], outbound: 'direct' })
+    const outbounds = config.outbounds as Array<Record<string, unknown>>
+    expect(outbounds.find(o => o.tag === 'diablo-tuic')).toMatchObject({ type: 'tuic', udp_relay_mode: 'native' })
+    expect(outbounds.find(o => o.tag === 'game-tuic')).toBeDefined()
+    expect((config.dns as { servers: Array<Record<string, unknown>> }).servers[0].detour).toBe('game-tuic')
+    expect((config.inbounds as Array<Record<string, unknown>>)[0].mtu).toBe(1400)
+  })
+
+  it.each(['direct', 'daily', 'game'] as const)('respects explicit Diablo %s choice before the game preset', (target) => {
+    const options = { mode: 'game' as const, strictRoute: true, ipv6: false,
+      appRules: [{ id: 'diablo', name: 'Diablo', executable: 'diablo iv.EXE', target, enabled: true }] }
+    const outbound = applicationOutbound('Diablo IV.exe', options)
+    expect(outbound).toBe(target === 'direct' ? 'direct' : target === 'daily' ? 'daily-vless' : 'diablo-tuic')
+    const config = buildSingBoxConfig(fallbackManifest, options)
+    expect((config.route as { rules: Array<Record<string, unknown>> }).rules[2].outbound).toBe(outbound)
+  })
+
+  it('diagnostics follow process overrides but global mode keeps its declared semantics', () => {
+    const options = { mode: 'fast' as const, strictRoute: true, ipv6: false,
+      appRules: [{ id: 'codex', name: 'Codex', executable: 'codex.exe', target: 'game' as const, enabled: true }] }
+    expect(applicationOutbound('Codex.exe', options)).toBe('game-tuic')
+    expect(applicationOutbound('ChatGPT.exe', options)).toBe('daily-vless')
+    expect(applicationOutbound('Codex.exe', { ...options, mode: 'global' })).toBe('daily-vless')
+    expect(applicationOutbound('Codex.exe', { ...options, mode: 'direct' })).toBe('direct')
+  })
   it('blocks virtual-subnet recirculation after DNS hijack and before application routes', () => {
     const config = buildSingBoxConfig(fallbackManifest, {
       mode: 'fast', appRules: [gameRule], strictRoute: true, ipv6: true,

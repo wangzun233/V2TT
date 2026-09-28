@@ -1,6 +1,11 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { createHealthMonitor, sampleHealth } = require('../../electron/health.cjs')
+const { createHealthMonitor, sampleHealth, allowsHealthRecovery } = require('../../electron/health.cjs')
+
+test('game mode warns instead of restarting a live game after unrelated health failures', () => {
+  assert.equal(allowsHealthRecovery('game'), false)
+  assert.equal(allowsHealthRecovery('fast'), true)
+})
 
 test('only sustained failures trigger once; successful sample resets the counter', async () => {
   let healthy = false

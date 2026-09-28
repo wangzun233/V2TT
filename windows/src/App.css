@@ -118,7 +118,7 @@ main { min-width: 0; background: var(--surface); }
 .power-button.is-connected { border-color: var(--green); color: var(--green); }
 .power-button svg { width: 35px; height: 35px; stroke-width: 1.7; }
 
-.mode-control { display: grid; grid-template-columns: repeat(4, 1fr); width: 440px; height: 42px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: #f8f9fb; }
+.mode-control { display: grid; grid-template-columns: repeat(5, 1fr); max-width: 100%; width: 440px; height: 42px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: #f8f9fb; }
 .mode-control button { border-radius: 4px; color: #5e697b; }
 .mode-control button:hover { color: var(--ink); }
 .mode-control button.active { background: var(--blue); color: white; box-shadow: 0 2px 7px rgba(23, 105, 232, .2); }

@@ -41,6 +41,11 @@ test('main workflow remains functional across desktop views', async ({ page }) =
   await page.getByRole('button', { name: '极速' }).click()
   await expect(page.getByText('默认 TUIC；OpenAI 默认 VLESS，应用规则优先')).toBeVisible()
   await expect(page.getByText('DEMO TUIC', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '游戏', exact: true }).click()
+  await expect(page.getByText('暗黑 IV · 独立 TUIC · 国内直连')).toBeVisible()
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await expect(page.locator('pre')).toContainText('diablo-tuic')
+  await page.getByRole('button', { name: '连接', exact: true }).click()
   await page.getByRole('button', { name: '智能' }).click()
 
   await page.getByRole('button', { name: '应用规则' }).click()
@@ -81,6 +86,10 @@ test('connection view fits the minimum desktop viewport', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(0)
   await page.screenshot({ path: 'artifacts/connection-1024.png', fullPage: true })
+  await page.getByRole('button', { name: '游戏', exact: true }).click()
+  await expect(page.getByText('暗黑 IV · 独立 TUIC · 国内直连')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
+  await page.screenshot({ path: 'artifacts/game-1024.png', fullPage: true })
 })
 
 test('captures the polished connection dashboard', async ({ page }) => {

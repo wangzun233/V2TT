@@ -7,6 +7,7 @@ const crypto = require('node:crypto')
 const { pathToFileURL } = require('node:url')
 const { createStartup } = require('./startup.cjs')
 const { createRuntime, connectionChanged } = require('./runtime.cjs')
+const { allowsHealthRecovery } = require('./health.cjs')
 const { DEFAULT_SETTINGS, normalizeSettings, validateMode, validateRules, validateSubscriptionUrl, validateManifest,
   assertActive, publicManifest, atomicWrite, readBounded, createQueue, redact } = require('./state.cjs')
 
@@ -22,7 +23,7 @@ const bundlePath = path.join(directory, 'account.bin')
 const settingsPath = path.join(directory, 'preferences.json')
 const queue = createQueue()
 const startup = createStartup(app)
-const labels = { smart: '智能', fast: '极速', global: '全局', direct: '直连' }
+const labels = { smart: '智能', fast: '极速', game: '游戏', global: '全局', direct: '直连' }
 let window = null
 let tray = null
 let quitting = false
@@ -88,6 +89,10 @@ const runtime = createRuntime({ app, directory, log, onChange: updateTray, onUne
   }, 5000 * recoveryAttempts)
 }, onUnhealthy: (pid, result) => {
   log('NETWORK_UNHEALTHY', { ...result, attempt: healthRecoveries })
+  if (!allowsHealthRecovery(runtime.status().mode)) {
+    log('NETWORK_RECOVERY_SKIPPED', { reason: 'game-session' })
+    return
+  }
   if (quitting || !bundle || healthRecoveries >= 2) return
   void queue(async () => {
     // A queued manual stop/switch invalidates evidence from the previous core.

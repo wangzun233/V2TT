@@ -46,6 +46,7 @@ function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, th
       const result = await sample(abort.signal)
       if (stopped) return
       failures = result.healthy ? 0 : failures + 1
+      if (result.healthy) notified = false
       onSample({ ...result, failures })
       if (failures >= threshold && !notified) {
         notified = true
@@ -63,4 +64,6 @@ function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, th
   return { tick, stop() { stopped = true; clearTimeout(timer); abort.abort() } }
 }
 
-module.exports = { createHealthMonitor, sampleHealth }
+function allowsHealthRecovery(mode) { return mode !== 'game' }
+
+module.exports = { createHealthMonitor, sampleHealth, allowsHealthRecovery }

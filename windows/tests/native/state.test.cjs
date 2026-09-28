@@ -62,7 +62,7 @@ test('streamed subscriptions are bounded without trusting content-length', async
 test('all routing modes and IPv6 choices pass the bundled sing-box validator', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'v2tt-config-test-'))
   try {
-    for (const mode of ['smart', 'fast', 'global', 'direct']) {
+    for (const mode of ['smart', 'fast', 'game', 'global', 'direct']) {
       for (const ipv6 of [false, true]) {
         const config = buildSingBoxConfig(manifest, { ...DEFAULT_SETTINGS, mode, ipv6, ruleSetDirectory: path.resolve('resources/rules') })
         // Use the same authenticated mixed inbound shape as live diagnostics.

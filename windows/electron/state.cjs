@@ -2,7 +2,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const net = require('node:net')
 
-const MODES = ['smart', 'fast', 'global', 'direct']
+const MODES = ['smart', 'fast', 'game', 'global', 'direct']
 const DEFAULT_RULES = [
   { id: 'steam', name: 'Steam', executable: 'steam.exe', target: 'game', enabled: true },
   { id: 'codex', name: 'Codex', executable: 'Codex.exe', target: 'daily', enabled: true },
