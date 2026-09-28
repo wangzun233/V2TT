@@ -5,6 +5,7 @@ import {
   SlidersHorizontal, Trash2, Zap,
 } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { version as appVersion } from '../package.json'
 import './App.css'
 import { MeasurementPanel } from './MeasurementPanel'
 import { fallbackManifest } from './data/fallbackManifest'
@@ -16,8 +17,6 @@ import type { AppRule, ConnectionState, DeviceManifest, DiagnosticItem, RouteMod
 
 type ViewId = 'connection' | 'rules' | 'lines' | 'diagnostics' | 'settings'
 type BooleanSettingKey = 'startup' | 'autoConnect' | 'strictRoute' | 'ipv6'
-
-const appVersion = '0.2.4'
 
 const navItems = [
   { id: 'connection' as const, label: '连接', icon: RadioTower },

@@ -6,11 +6,11 @@ Windows 与 Android 原生代理客户端，使用同一份 V2TT 专属 JSON 订
 
 ## 下载与使用
 
-Windows 正式安装版见 [v0.2.6](https://github.com/wangzun233/V2TT/releases/tag/v0.2.6)。Android 保持 [网络测速预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
+Windows 正式安装版见 [v0.2.7](https://github.com/wangzun233/V2TT/releases/tag/v0.2.7)。Android 保持 [网络测速预览版](https://github.com/wangzun233/V2TT/releases/tag/v2026.09.14-measurement-preview)。仓库已经公开，下载无需共享 GitHub 密码。历史版本见 [Releases](https://github.com/wangzun233/V2TT/releases)。
 
 | 平台 | 本次版本 | 文件 | 说明 |
 | --- | --- | --- | --- |
-| Windows 10/11 x64 | 0.2.6 | `V2TT-Client-Setup-0.2.6-Windows-x64.exe` | 正式版；尚无数字签名，网络效果取决于线路和服务端 |
+| Windows 10/11 x64 | 0.2.7 | `V2TT-Client-Setup-0.2.7-Windows-x64.exe` | 正式修正版；修复版本号显示，尚无数字签名 |
 | Android 8.0+ ARM64 | 0.1.3 Preview | `V2TT-Android-0.1.3-arm64-v8a-debug.apk` | Debug 签名；本轮通过模拟器测试，仍需真机验证 |
 
 安装后自行导入管理员通过私密渠道发放的 **V2TT Client 专属 HTTPS JSON 订阅**。不是 Clash YAML、Hiddify 订阅或单节点分享链接。安装包不提供账号，不保证任何地区、运营商或目标网站可用。

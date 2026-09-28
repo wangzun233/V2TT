@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
+
+test('sidebar version matches package metadata', async ({ page }) => {
+  const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
+  await page.goto('/')
+  await expect(page.locator('.sidebar-footer .version')).toHaveText(`v${version}`)
+})
 
 test('failed app bundle shows recovery controls instead of a blank window', async ({ page }) => {
   await page.route('**/assets/*.js', (route) => route.abort())
