@@ -119,7 +119,7 @@ class DesktopBridge {
     throw new Error('浏览器预览无法运行网络诊断')
   }
 
-  async testNode(id: 'vless' | 'tuic'): Promise<DiagnosticItem> {
+  async testNode(id: 'vless' | 'tuic' | 'tcp'): Promise<DiagnosticItem> {
     if (window.v2tt) return window.v2tt.testNode({ id })
     return { id, name: id, status: 'idle', detail: '请在 Windows 客户端中测试' }
   }

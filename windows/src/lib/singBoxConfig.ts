@@ -4,6 +4,7 @@ import type {
   RouteMode,
   TuicNode,
   VlessNode,
+  TcpNode,
 } from '../types'
 
 export interface ConfigOptions {
@@ -26,6 +27,7 @@ export function applicationOutbound(executable: string, options: ConfigOptions):
   if (options.mode === 'global') return 'daily-vless'
   const diablo = executable.toLowerCase() === 'diablo iv.exe'
   const rule = options.appRules.find(r => r.enabled && r.executable.toLowerCase() === executable.toLowerCase())
+  if (options.mode === 'tcp') return rule?.target === 'direct' ? 'direct' : 'tcp-vless'
   if (rule) return rule.target === 'direct' ? 'direct' : rule.target === 'daily' ? 'daily-vless' : options.mode === 'game' && diablo ? 'diablo-tuic' : 'game-tuic'
   if (options.mode === 'game' && diablo) return 'diablo-tuic'
   if (options.mode === 'fast' && !protectedDailyProcesses.some(p => p.toLowerCase() === executable.toLowerCase())) return 'game-tuic'
@@ -44,10 +46,10 @@ function findNode<T extends VlessNode | TuicNode>(
   return node as T
 }
 
-function vlessOutbound(node: VlessNode): JsonRecord {
+function vlessOutbound(node: VlessNode | TcpNode): JsonRecord {
   return {
     type: 'vless',
-    tag: 'daily-vless',
+    tag: node.role === 'tcp' ? 'tcp-vless' : 'daily-vless',
     server: node.server,
     server_port: node.server_port,
     uuid: node.uuid,
@@ -55,11 +57,11 @@ function vlessOutbound(node: VlessNode): JsonRecord {
       enabled: node.tls.enabled,
       server_name: node.tls.server_name,
     },
-    transport: {
+    ...(node.transport.type === 'ws' ? { transport: {
       type: 'ws',
       path: node.transport.path,
       headers: { Host: node.transport.host },
-    },
+    } } : {}),
   }
 }
 
@@ -96,6 +98,7 @@ export function buildSingBoxConfig(
     'tuic',
   )
   const activeRules = options.appRules.filter((rule) => rule.enabled)
+  if (options.mode === 'tcp' && !manifest.tcp_node) throw new Error('订阅缺少 TCP 线路，请更新订阅')
   const processes = (target: AppRule['target']) =>
     activeRules
       .filter((rule) => rule.target === target)
@@ -108,10 +111,10 @@ export function buildSingBoxConfig(
     ? 'direct'
     : options.mode === 'fast'
       ? 'game-tuic'
-      : 'daily-vless'
+      : options.mode === 'tcp' ? 'tcp-vless' : 'daily-vless'
   const modeRules: JsonRecord[] = []
   const gameMode = options.mode === 'game'
-  const split = options.mode === 'smart' || options.mode === 'fast' || gameMode
+  const split = options.mode === 'smart' || options.mode === 'fast' || gameMode || options.mode === 'tcp'
   const earlyRules: JsonRecord[] = gameMode ? [
     { port: 53, action: 'hijack-dns' },
     { ip_cidr: ['172.19.0.0/30', 'fdfe:dcba:9876::/126'], action: 'reject', method: 'drop' },
@@ -127,7 +130,7 @@ export function buildSingBoxConfig(
     for (const [target, outbound] of processRoutes) {
       const processNames = processes(target)
       if (processNames.length) {
-        modeRules.push({ process_path_regex: processNames.map(processPattern), outbound })
+        modeRules.push({ process_path_regex: processNames.map(processPattern), outbound: options.mode === 'tcp' && target !== 'direct' ? 'tcp-vless' : outbound })
       }
     }
     // Explicit application choices take precedence over compatibility defaults.
@@ -142,7 +145,7 @@ export function buildSingBoxConfig(
       { ip_is_private: true, outbound: 'direct' },
       { domain_suffix: ['.cn'], outbound: 'direct' },
     )
-    if (options.mode === 'smart' || gameMode) {
+    if (options.mode === 'smart' || gameMode || options.mode === 'tcp') {
       // Browsers fall back to TCP when QUIC is dropped. This avoids tunnelling
       // web UDP/443 over the WebSocket daily route; game rules above keep TUIC.
       modeRules.splice(modeRules.length - 2, 0, { network: 'udp', port: 443, action: 'reject', method: 'drop' })
@@ -184,6 +187,7 @@ export function buildSingBoxConfig(
     ],
     outbounds: [
       vlessOutbound(daily),
+      ...(manifest.tcp_node ? [vlessOutbound(manifest.tcp_node)] : []),
       tuicOutbound(game),
       ...(gameMode ? [{ ...tuicOutbound(game), tag: 'diablo-tuic', udp_relay_mode: 'native' }] : []),
       { type: 'direct', tag: 'direct' },

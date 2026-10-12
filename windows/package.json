@@ -4,7 +4,7 @@
   "author": "V2TT",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "0.2.7",
+  "version": "0.2.8-rc.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -57,7 +57,9 @@
       "enableEmbeddedAsarIntegrityValidation": true,
       "onlyLoadAppFromAsar": true
     },
-    "asarUnpack": ["electron/watchdog.ps1"],
+    "asarUnpack": [
+      "electron/watchdog.ps1"
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -80,7 +82,14 @@
       "output": "release"
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "requestedExecutionLevel": "requireAdministrator",
       "artifactName": "V2TT-Client-${version}-Windows-${arch}.${ext}"
@@ -97,7 +106,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "V2TT Client",
       "deleteAppDataOnUninstall": false,
-      "installerLanguages": ["zh_CN", "en_US"],
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
       "displayLanguageSelector": false,
       "include": "build/installer.nsh",
       "artifactName": "V2TT-Client-Setup-${version}-Windows-${arch}.${ext}",

@@ -15,6 +15,23 @@ const gameRule: AppRule = {
 }
 
 describe('buildSingBoxConfig', () => {
+  it('TCP mode uses TLS without WS, keeps domestic rules and never selects TUIC for applications or DNS', () => {
+    const manifest = structuredClone(fallbackManifest)
+    const daily = manifest.nodes.find(n => n.type === 'vless')!
+    manifest.tcp_node = { ...daily, id: 'tcp', role: 'tcp', transport: { type: 'tcp' } }
+    const options = { mode: 'tcp' as const, appRules: [gameRule], strictRoute: true, ipv6: false }
+    const config = buildSingBoxConfig(manifest, options)
+    const route = config.route as { final: string; rules: Array<Record<string, unknown>> }
+    expect(route.final).toBe('tcp-vless')
+    expect(route.rules.some(r => r.outbound === 'game-tuic')).toBe(false)
+    expect(route.rules).toContainEqual({ rule_set: ['geosite-cn', 'geoip-cn'], outbound: 'direct' })
+    expect((config.dns as { servers: Array<{ detour?: string }> }).servers[0].detour).toBe('tcp-vless')
+    const outbound = (config.outbounds as Array<Record<string, unknown>>).find(n => n.tag === 'tcp-vless')!
+    expect(outbound.transport).toBeUndefined()
+    expect(outbound.tls).toMatchObject({ enabled: true })
+    expect(applicationOutbound('game.exe', options)).toBe('tcp-vless')
+    expect(applicationOutbound('game.exe', { ...options, appRules: [{ ...gameRule, target: 'direct' }] })).toBe('direct')
+  })
   it('isolates Diablo traffic before sniff without capturing the launcher or changing domestic rules', () => {
     const config = buildSingBoxConfig(fallbackManifest, { mode: 'game', appRules: [], strictRoute: true, ipv6: false })
     const { rules, final } = config.route as { rules: Array<Record<string, unknown>>; final: string }

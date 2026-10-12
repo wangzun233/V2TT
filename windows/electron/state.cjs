@@ -2,7 +2,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const net = require('node:net')
 
-const MODES = ['smart', 'fast', 'game', 'global', 'direct']
+const MODES = ['smart', 'fast', 'game', 'tcp', 'global', 'direct']
 const DEFAULT_RULES = [
   { id: 'steam', name: 'Steam', executable: 'steam.exe', target: 'game', enabled: true },
   { id: 'codex', name: 'Codex', executable: 'Codex.exe', target: 'daily', enabled: true },
@@ -99,8 +99,22 @@ function validateManifest(value) {
   })
   const routing = value.routing
   if (new Set(nodes.map((n) => n.id)).size !== 2 || !nodes.some((n) => n.type === 'vless' && n.id === routing?.daily_node) || !nodes.some((n) => n.type === 'tuic' && n.id === routing?.game_node)) throw new Error('订阅中的线路引用无效')
+  let tcpNode
+  if (value.tcp_node !== undefined) {
+    const n = value.tcp_node
+    if (n?.type !== 'vless' || n.role !== 'tcp' || n.transport?.type !== 'tcp' || n.tls?.enabled !== true) throw new Error('TCP 线路必须使用 VLESS TCP TLS')
+    // Reuse legacy node validation without accepting new transports in legacy slots.
+    const checked = validateManifest({ ...value, tcp_node: undefined, nodes: [
+      { ...n, role: 'daily', transport: { type: 'ws', path: '/', host: n.tls.server_name } },
+      nodes.find(x => x.type === 'tuic'),
+    ], routing: { default_mode: 'smart', daily_node: n.id, game_node: routing.game_node } }).nodes[0]
+    if (nodes.some(x => x.id === checked.id)) throw new Error('TCP 节点 ID 重复')
+    tcpNode = { ...checked, role: 'tcp', transport: { type: 'tcp' } }
+  }
+  if (routing.default_mode === 'tcp' && !tcpNode) throw new Error('订阅缺少 TCP 线路')
   return {
     schema_version: 1, generated_at: typeof value.generated_at === 'string' ? value.generated_at : '',
+    ...(tcpNode ? { tcp_node: tcpNode } : {}),
     profile: { id: profile.id, name: profile.name, expires_at: profile.expires_at, update_interval_hours: Math.min(24, Math.max(1, Number(profile.update_interval_hours) || 24)) },
     routing: { default_mode: validateMode(routing.default_mode), daily_node: routing.daily_node, game_node: routing.game_node }, nodes,
   }
@@ -120,10 +134,10 @@ function redact(value) {
 
 function publicManifest(manifest) {
   const result = structuredClone(manifest)
-  for (const node of result.nodes) {
+  for (const node of [...result.nodes, ...(result.tcp_node ? [result.tcp_node] : [])]) {
     node.uuid = '[REDACTED]'
     if (node.password) node.password = '[REDACTED]'
-    if (node.transport) node.transport.path = '/[REDACTED]'
+    if (node.transport?.type === 'ws') node.transport.path = '/[REDACTED]'
   }
   return result
 }

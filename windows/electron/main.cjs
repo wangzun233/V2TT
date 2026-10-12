@@ -7,7 +7,7 @@ const crypto = require('node:crypto')
 const { pathToFileURL } = require('node:url')
 const { createStartup } = require('./startup.cjs')
 const { createRuntime, connectionChanged } = require('./runtime.cjs')
-const { allowsHealthRecovery } = require('./health.cjs')
+const { allowsHealthRecovery, createRecoveryBudget } = require('./health.cjs')
 const { DEFAULT_SETTINGS, normalizeSettings, validateMode, validateRules, validateSubscriptionUrl, validateManifest,
   assertActive, publicManifest, atomicWrite, readBounded, createQueue, redact } = require('./state.cjs')
 
@@ -23,7 +23,7 @@ const bundlePath = path.join(directory, 'account.bin')
 const settingsPath = path.join(directory, 'preferences.json')
 const queue = createQueue()
 const startup = createStartup(app)
-const labels = { smart: '智能', fast: '极速', game: '游戏', global: '全局', direct: '直连' }
+const labels = { smart: '智能', fast: '极速', game: '游戏', tcp: 'TCP', global: '全局', direct: '直连' }
 let window = null
 let tray = null
 let quitting = false
@@ -32,7 +32,7 @@ let bundle = null
 let source = 'cache'
 let settings = structuredClone(DEFAULT_SETTINGS)
 let recoveryAttempts = 0
-let healthRecoveries = 0
+const healthBudget = createRecoveryBudget()
 let recoverTimer = null
 let refreshTimer = null
 let expiryTimer = null
@@ -88,19 +88,28 @@ const runtime = createRuntime({ app, directory, log, onChange: updateTray, onUne
     }).catch((error) => runtime.setError(error.message))
   }, 5000 * recoveryAttempts)
 }, onUnhealthy: (pid, result) => {
-  log('NETWORK_UNHEALTHY', { ...result, attempt: healthRecoveries })
+  log('NETWORK_UNHEALTHY', { ...result, attempt: healthBudget.used() })
   if (!allowsHealthRecovery(runtime.status().mode)) {
     log('NETWORK_RECOVERY_SKIPPED', { reason: 'game-session' })
     return
   }
-  if (quitting || !bundle || healthRecoveries >= 2) return
+  if (quitting || !bundle) return
+  if (healthBudget.exhausted()) {
+    log('NETWORK_RECOVERY_SKIPPED', { reason: 'budget-exhausted' })
+    runtime.setError('自动重连已达两次上限，请检查线路或手动重连；连续正常十分钟后恢复重连额度')
+    return
+  }
   void queue(async () => {
     // A queued manual stop/switch invalidates evidence from the previous core.
-    if (quitting || !bundle || !runtime.ownsProcess(pid) || healthRecoveries >= 2) return
-    healthRecoveries += 1
-    log('NETWORK_RECOVERY', { attempt: healthRecoveries })
+    if (quitting || !bundle || !runtime.ownsProcess(pid) || !healthBudget.consume()) return
+    log('NETWORK_RECOVERY', { attempt: healthBudget.used() })
     await connect(settings.lastMode, false, 'network-health-failure')
   }).catch((error) => { log('NETWORK_RECOVERY_FAILED', error); runtime.setError(error.message) })
+}, onHealthSample: (result) => {
+  if (healthBudget.observe(result.healthy)) log('NETWORK_RECOVERY_BUDGET_RESET', { reason: 'sustained-healthy' })
+  if (!result.healthy && result.failures >= 3 && allowsHealthRecovery(runtime.status().mode) && healthBudget.exhausted()) {
+    runtime.setError('自动重连已达两次上限，请检查线路或手动重连；连续正常十分钟后恢复重连额度')
+  }
 } })
 
 function showWindow() {
@@ -199,7 +208,7 @@ async function connect(mode, resetRecovery = true, reason = 'user') {
   const manifest = mode === 'direct' ? bundle?.manifest : requireAccount()
   log('CONNECT_REQUEST', { mode, reason, previousState: runtime.status().state })
   if (resetRecovery) recoveryAttempts = 0
-  if (reason === 'user') healthRecoveries = 0
+  if (reason === 'user') healthBudget.reset()
   clearTimeout(recoverTimer)
   const result = await runtime.start(manifest, settings, mode)
   saveSettings({ ...settings, lastMode: mode })
@@ -339,7 +348,7 @@ register('measurement:start', (payload) => {
 register('measurement:status', () => runtime.measurementStatus())
 register('measurement:cancel', () => runtime.cancelMeasurement())
 register('diagnostics:node', (payload) => {
-  if (!['vless', 'tuic'].includes(payload?.id)) throw new Error('无效的测试线路')
+  if (!['vless', 'tuic', 'tcp'].includes(payload?.id)) throw new Error('无效的测试线路')
   return runtime.testNode(payload.id)
 }, true)
 register('support:export', async () => {

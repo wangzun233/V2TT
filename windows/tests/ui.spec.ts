@@ -2,6 +2,36 @@ import { expect, test } from '@playwright/test'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
+import { fallbackManifest } from '../src/data/fallbackManifest'
+
+test('TCP mode restores safely and exposes its independent line at minimum window size', async ({ page }) => {
+  const manifest = structuredClone(fallbackManifest)
+  const daily = manifest.nodes.find(n => n.type === 'vless')!
+  manifest.tcp_node = { ...daily, id: 'demo-tcp', name: 'DEMO TCP Direct', role: 'tcp', transport: { type: 'tcp' } }
+  await page.addInitScript((manifest) => {
+    const status = { state: 'disconnected', mode: 'tcp', downloadBytes: 0, uploadBytes: 0, downloadRate: 0, uploadRate: 0 }
+    Object.assign(window, { v2tt: {
+      getSubscription: async () => ({ configured: true, url: 'https://example.com/test' }),
+      getSettings: async () => ({ startup: false, autoConnect: false, strictRoute: true, ipv6: false, lastMode: 'tcp', appRules: [] }),
+      getStatus: async () => status,
+      getManifest: async () => { await new Promise(r => setTimeout(r, 300)); return { manifest, source: 'remote' } },
+      testNode: async ({ id }: { id: string }) => ({ id, name: id, status: 'idle', detail: '测试桩，无网络探测' }),
+    } })
+  }, manifest)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: 'TCP', exact: true })).toBeEnabled()
+  await expect(page.getByText('国内直连 · 国外 TCP TLS · 不使用 TUIC')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0)
+  await page.screenshot({ path: 'artifacts/tcp-1024.png', fullPage: true })
+  await page.getByRole('button', { name: '线路', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'DEMO TCP Direct' })).toBeVisible()
+  await page.getByRole('button', { name: '测试 DEMO TCP Direct' }).click()
+  await expect(page.getByText('测试桩，无网络探测')).toBeVisible()
+  expect(errors).toEqual([])
+})
 
 test('sidebar version matches package metadata', async ({ page }) => {
   const { version } = JSON.parse(readFileSync('package.json', 'utf8'))

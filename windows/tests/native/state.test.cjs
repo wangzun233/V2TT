@@ -9,6 +9,26 @@ const { DEFAULT_SETTINGS, validateManifest, validateSubscriptionUrl, validateRul
 
 const { manifest } = require('./fixture.cjs')
 
+test('optional TCP extension is validated, redacted and does not change legacy slots', () => {
+  const candidate = structuredClone(manifest)
+  candidate.tcp_node = { ...candidate.nodes[0], id: 'tcp', role: 'tcp', transport: { type: 'tcp' } }
+  const result = validateManifest(candidate)
+  assert.equal(result.nodes.length, 2)
+  assert.equal(result.tcp_node.transport.type, 'tcp')
+  assert.equal(publicManifest(result).tcp_node.uuid, '[REDACTED]')
+  assert.equal(normalizeTcp(result).route.final, 'tcp-vless')
+  candidate.tcp_node.tls.enabled = false
+  assert.throws(() => validateManifest(candidate), /TLS/)
+})
+
+function normalizeTcp(value) {
+  return buildSingBoxConfig(value, { ...DEFAULT_SETTINGS, mode: 'tcp' })
+}
+
+test('TCP mode fails closed without the optional node', () => {
+  assert.throws(() => normalizeTcp(manifest), /TCP/)
+})
+
 test('manifest normalization rejects malformed routing and TLS and removes injected options', () => {
   const candidate = structuredClone(manifest)
   candidate.nodes[0].tls.insecure = true
@@ -62,9 +82,11 @@ test('streamed subscriptions are bounded without trusting content-length', async
 test('all routing modes and IPv6 choices pass the bundled sing-box validator', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'v2tt-config-test-'))
   try {
-    for (const mode of ['smart', 'fast', 'game', 'global', 'direct']) {
+    const withTcp = structuredClone(manifest)
+    withTcp.tcp_node = { ...withTcp.nodes[0], id: 'tcp', role: 'tcp', transport: { type: 'tcp' } }
+    for (const mode of ['smart', 'fast', 'game', 'tcp', 'global', 'direct']) {
       for (const ipv6 of [false, true]) {
-        const config = buildSingBoxConfig(manifest, { ...DEFAULT_SETTINGS, mode, ipv6, ruleSetDirectory: path.resolve('resources/rules') })
+        const config = buildSingBoxConfig(mode === 'tcp' ? withTcp : manifest, { ...DEFAULT_SETTINGS, mode, ipv6, ruleSetDirectory: path.resolve('resources/rules') })
         // Use the same authenticated mixed inbound shape as live diagnostics.
         config.inbounds.push({ type: 'mixed', tag: 'probe-daily', listen: '127.0.0.1', listen_port: 45679, users: [{ username: 'probe', password: 'test' }] })
         config.route.rules.unshift({ inbound: ['probe-daily'], outbound: 'daily-vless' })

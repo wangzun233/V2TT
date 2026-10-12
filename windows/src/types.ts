@@ -1,4 +1,4 @@
-export type RouteMode = 'smart' | 'fast' | 'game' | 'global' | 'direct'
+export type RouteMode = 'smart' | 'fast' | 'game' | 'tcp' | 'global' | 'direct'
 export type RouteTarget = 'daily' | 'game' | 'direct'
 export type ConnectionState = 'connected' | 'connecting' | 'disconnected'
 
@@ -30,7 +30,13 @@ export interface TuicNode {
 
 export type ProxyNode = VlessNode | TuicNode
 
+export interface TcpNode extends Omit<VlessNode, 'role' | 'transport'> {
+  role: 'tcp'
+  transport: { type: 'tcp' }
+}
+
 export interface DeviceManifest {
+  tcp_node?: TcpNode
   schema_version: number
   generated_at: string
   profile: {

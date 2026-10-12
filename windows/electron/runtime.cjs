@@ -17,7 +17,7 @@ function connectionChanged(previous, next, settings, mode) {
   return !isDeepStrictEqual(buildSingBoxConfig(previous, options), buildSingBoxConfig(next, options))
 }
 
-function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhealthy }) {
+function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhealthy, onHealthSample }) {
   const binary = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'sing-box.exe') : path.join(app.getAppPath(), 'resources', 'bin', 'sing-box.exe')
   const rules = app.isPackaged ? path.join(process.resourcesPath, 'rules') : path.join(app.getAppPath(), 'resources', 'rules')
   const configPath = path.join(directory, 'config.json')
@@ -74,12 +74,16 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
       if (!fs.existsSync(binary)) throw new Error('代理内核文件缺失，请重新安装并检查安全软件的隔离记录')
       for (const name of ['geoip-cn', 'geosite-cn']) if (!fs.existsSync(path.join(rules, `${name}.srs`))) throw new Error('国内分流规则缺失，请重新安装')
       const ports = new Set()
-      while (ports.size < 5) ports.add(await freePort())
-      const [port, dailyPort, gamePort, directPort, sessionPort] = [...ports]
-      controller = { port, dailyPort, gamePort, directPort, sessionPort, secret: crypto.randomBytes(24).toString('hex'), password: crypto.randomBytes(24).toString('hex') }
+      while (ports.size < 6) ports.add(await freePort())
+      const [port, dailyPort, gamePort, directPort, sessionPort, tcpPort] = [...ports]
+      controller = { port, dailyPort, gamePort, directPort, sessionPort, tcpPort: manifest.tcp_node ? tcpPort : null, secret: crypto.randomBytes(24).toString('hex'), password: crypto.randomBytes(24).toString('hex') }
       activeOptions = structuredClone({ ...settings, mode })
       const config = buildSingBoxConfig(manifest, { ...settings, mode, ruleSetDirectory: rules })
       config.experimental.clash_api = { external_controller: `127.0.0.1:${port}`, secret: controller.secret }
+      if (manifest.tcp_node) {
+        config.inbounds.push({ type: 'mixed', tag: 'probe-tcp', listen: '127.0.0.1', listen_port: tcpPort, users: [{ username: 'probe', password: controller.password }] })
+        config.route.rules.unshift({ inbound: ['probe-tcp'], outbound: 'tcp-vless' })
+      }
       for (const [role, listenPort, outbound] of [['daily', dailyPort, 'daily-vless'], ['game', gamePort, 'game-tuic'], ['direct', directPort, 'direct'], ['session', sessionPort, mode === 'game' ? 'diablo-tuic' : 'game-tuic']]) {
         config.inbounds.push({ type: 'mixed', tag: `probe-${role}`, listen: '127.0.0.1', listen_port: listenPort, users: [{ username: 'probe', password: controller.password }] })
         config.route.rules.unshift({ inbound: [`probe-${role}`], outbound })
@@ -129,13 +133,14 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
       healthMonitor = createHealthMonitor({
         sample: (signal) => sampleHealth({ signal,
           control: async () => (await controllerFetch('/version')).ok,
-          port: mode === 'fast' ? activeController.gamePort : activeController.dailyPort,
+          port: mode === 'tcp' ? activeController.tcpPort : mode === 'fast' ? activeController.gamePort : activeController.dailyPort,
           password: activeController.password }),
         onSample(result) {
           if (child !== core) return
           log('NETWORK_HEALTH', { mode, uptimeMs: Date.now() - startedAt, ...result })
           healthError = result.healthy ? '' : '网络连通性异常，正在复查'
           update({ error: healthError })
+          onHealthSample?.(result)
         },
         onFailure(result) {
           if (child !== core) return
@@ -177,6 +182,13 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
   }
 
   async function testNode(id) {
+    if (id === 'tcp') {
+      if (!controller?.tcpPort || !child) return { id, name: 'TCP 线路', status: 'idle', detail: '请更新订阅并连接后测试' }
+      try {
+        const result = await probe('https://www.gstatic.com/generate_204', controller.tcpPort, controller.password)
+        return { id, name: 'TCP 线路', status: result.httpStatus === 204 ? 'success' : 'warning', detail: `TCP TLS 实际出口 HTTP ${result.httpStatus}`, ...result }
+      } catch (error) { return { id, name: 'TCP 线路', status: 'error', detail: redact(error.message) } }
+    }
     if (!controller || !child || status.state !== 'connected') return { id, name: id === 'vless' ? '日常线路' : '游戏线路', status: 'idle', detail: '请先连接代理线路' }
     const endpoint = id === 'vless' ? controller.dailyPort : status.mode === 'game' ? controller.sessionPort : controller.gamePort
     try {
@@ -211,13 +223,13 @@ function createRuntime({ app, directory, log, onChange, onUnexpectedExit, onUnhe
     async diagnose(manifest, source) {
       const results = [{ id: 'manifest', name: '订阅与账号', status: 'success', detail: source === 'remote' ? '订阅验证有效' : '当前使用本机加密缓存' }]
       try { assertActive(manifest) } catch (error) { results[0] = { ...results[0], status: 'error', detail: error.message } }
-      results.push(...await Promise.all(['vless', 'tuic'].map(testNode)))
+      results.push(...await Promise.all(['vless', 'tuic', ...(manifest.tcp_node ? ['tcp'] : [])].map(testNode)))
       for (const [id, name, url] of [['chatgpt', 'ChatGPT 网页', 'https://chatgpt.com/'], ['codex', 'OpenAI API 连通性', 'https://api.openai.com/v1/models']]) {
         if (!controller || !child) { results.push({ id, name, status: 'idle', detail: '请先连接代理线路' }); continue }
         try {
           const outbound = applicationOutbound(id === 'codex' ? 'Codex.exe' : 'ChatGPT.exe', activeOptions)
-          const route = outbound === 'game-tuic' ? 'TUIC' : outbound === 'direct' ? 'DIRECT' : 'VLESS'
-          const port = outbound === 'game-tuic' ? controller.gamePort : outbound === 'direct' ? controller.directPort : controller.dailyPort
+          const route = outbound === 'tcp-vless' ? 'TCP TLS' : outbound === 'game-tuic' ? 'TUIC' : outbound === 'direct' ? 'DIRECT' : 'VLESS'
+          const port = outbound === 'tcp-vless' ? controller.tcpPort : outbound === 'game-tuic' ? controller.gamePort : outbound === 'direct' ? controller.directPort : controller.dailyPort
           const result = await probe(url, port, controller.password)
           const reachable = result.httpStatus < 400 || (id === 'codex' && result.httpStatus === 401)
           results.push({ id, name, status: reachable ? 'success' : 'warning', ...result,

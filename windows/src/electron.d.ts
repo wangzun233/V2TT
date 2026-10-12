@@ -17,7 +17,7 @@ declare global {
       disconnect: () => Promise<DesktopStatus>
       setMode: (payload: { mode: RouteMode }) => Promise<DesktopStatus>
       runDiagnostics: () => Promise<DiagnosticItem[]>
-      testNode: (payload: { id: 'vless' | 'tuic' }) => Promise<DiagnosticItem>
+      testNode: (payload: { id: 'vless' | 'tuic' | 'tcp' }) => Promise<DiagnosticItem>
       exportReport: () => Promise<{ saved: boolean }>
       startMeasurement: (payload: { id: 'direct' | 'vless' | 'tuic'; kind: 'latency' | 'speed' }) => Promise<MeasurementStatus>
       measurementStatus: () => Promise<MeasurementStatus>

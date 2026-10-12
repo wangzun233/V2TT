@@ -24,14 +24,17 @@ async function sampleHealth({ control, port, password, signal, dnsProbe = checkD
   ])
   signal.throwIfAborted()
   // An HTTP rejection still proves TLS/transport reachability; it is not an outage.
-  const web = primary || await reachable(() => httpProbe('https://www.cloudflare.com/cdn-cgi/trace', undefined, undefined, signal))
+  const [web, explicit] = primary && controller && dnsOk ? [true, null] : await Promise.all([
+    primary ? Promise.resolve(true) : reachable(() => httpProbe('https://www.cloudflare.com/cdn-cgi/trace', undefined, undefined, signal)),
+    reachable(() => httpProbe('https://1.1.1.1/cdn-cgi/trace', port, password, signal)),
+  ])
   const healthy = controller && dnsOk && web
-  const proxy = healthy ? null : await reachable(() => httpProbe('https://1.1.1.1/cdn-cgi/trace', port, password, signal))
+  const proxy = healthy ? null : explicit
   signal.throwIfAborted()
   return { healthy, controller, dns: dnsOk, web, proxy }
 }
 
-function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, threshold = 3 }) {
+function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, retryInterval = 5000, threshold = 3 }) {
   let stopped = false
   let timer
   let failures = 0
@@ -56,7 +59,7 @@ function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, th
       // A probe implementation failure is not evidence of network failure.
     } finally {
       busy = false
-      if (!stopped) { timer = setTimeout(tick, interval); timer.unref?.() }
+      if (!stopped) { timer = setTimeout(tick, failures > 0 && !notified ? retryInterval : interval); timer.unref?.() }
     }
   }
   timer = setTimeout(tick, interval)
@@ -66,4 +69,25 @@ function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, th
 
 function allowsHealthRecovery(mode) { return mode !== 'game' }
 
-module.exports = { createHealthMonitor, sampleHealth, allowsHealthRecovery }
+function createRecoveryBudget({ now = Date.now, limit = 2, healthyWindow = 600000, maxSampleGap = 90000 } = {}) {
+  let attempts = 0, healthySince = null, lastSample = null
+  return {
+    reset() { attempts = 0; healthySince = null; lastSample = null },
+    used: () => attempts,
+    exhausted: () => attempts >= limit,
+    consume() { if (attempts >= limit) return false; attempts++; healthySince = null; return true },
+    observe(healthy) {
+      const time = now()
+      if (!healthy) healthySince = null
+      else if (healthySince === null || lastSample === null || time - lastSample > maxSampleGap || time < lastSample) healthySince = time
+      lastSample = time
+      if (healthy && attempts > 0 && time - healthySince >= healthyWindow) {
+        attempts = 0
+        return true
+      }
+      return false
+    },
+  }
+}
+
+module.exports = { createHealthMonitor, sampleHealth, allowsHealthRecovery, createRecoveryBudget }

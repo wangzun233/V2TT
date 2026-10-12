@@ -39,7 +39,7 @@ const initialDiagnostics: DiagnosticItem[] = [
   { id: 'codex', name: 'OpenAI API 连通性', detail: '未登录 API 连通性测试', status: 'idle' },
 ]
 
-const modeLabels: Record<RouteMode, string> = { smart: '智能', fast: '极速', game: '游戏', global: '全局', direct: '直连' }
+const modeLabels: Record<RouteMode, string> = { smart: '智能', fast: '极速', game: '游戏', tcp: 'TCP', global: '全局', direct: '直连' }
 const targetLabels: Record<RouteTarget, string> = { daily: '日常线路', game: '游戏线路', direct: '直连' }
 function chartPath(values: number[], width: number, height: number, max: number) {
   return values.map((value, index) => {
@@ -158,7 +158,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
   onOpenRules: () => void
 }) {
   const connected = state === 'connected'
-  const daily = manifest.nodes.find((node) => node.role === 'daily')
+  const daily = mode === 'tcp' ? manifest.tcp_node : manifest.nodes.find((node) => node.role === 'daily')
   const game = manifest.nodes.find((node) => node.role === 'game')
   const health = diagnostics.filter((item) => item.status !== 'idle').slice(0, 4)
   const chartMax = Math.max(...downloadHistory, ...uploadHistory, 125_000)
@@ -174,7 +174,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
       <header className="page-header connection-header">
         <div>
           <div className="status-title"><span className={`status-dot ${state}`} /><h1>{state === 'connected' ? '已连接' : state === 'connecting' ? '正在连接' : '未连接'}</h1></div>
-          <p>{mode === 'smart' ? '国内直连，国外使用兼容线路' : mode === 'fast' ? '默认 TUIC；OpenAI 默认 VLESS，应用规则优先' : mode === 'game' ? '暗黑 IV · 独立 TUIC · 国内直连' : mode === 'global' ? '所有流量使用日常线路' : '所有流量绕过代理'}</p>
+          <p>{mode === 'tcp' ? '国内直连 · 国外 TCP TLS · 不使用 TUIC' : mode === 'smart' ? '国内直连，国外使用兼容线路' : mode === 'fast' ? '默认 TUIC；OpenAI 默认 VLESS，应用规则优先' : mode === 'game' ? '暗黑 IV · 独立 TUIC · 国内直连' : mode === 'global' ? '所有流量使用日常线路' : '所有流量绕过代理'}</p>
         </div>
         <button type="button" className={`power-button ${connected ? 'is-connected' : ''}`} onClick={onToggleConnection} disabled={state === 'connecting'} aria-label={connected ? '断开连接' : '开始连接'} title={connected ? '断开连接' : '开始连接'}>
           {state === 'connecting' ? <RefreshCw className="spin" /> : <Power />}
@@ -182,7 +182,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
       </header>
 
       <div className="mode-control" aria-label="代理模式">
-        {(Object.keys(modeLabels) as RouteMode[]).map((item) => <button type="button" key={item} className={mode === item ? 'active' : ''} disabled={state === 'connecting'} onClick={() => onModeChange(item)}>{modeLabels[item]}</button>)}
+        {(Object.keys(modeLabels) as RouteMode[]).map((item) => <button type="button" key={item} className={mode === item ? 'active' : ''} title={item === 'tcp' && !manifest.tcp_node ? '请更新包含 TCP 线路的订阅' : modeLabels[item]} disabled={state === 'connecting' || (item === 'tcp' && !manifest.tcp_node)} onClick={() => onModeChange(item)}>{modeLabels[item]}</button>)}
       </div>
       {connectionError && <div className="connection-error" role="alert"><CircleAlert />{connectionError}</div>}
 
@@ -193,7 +193,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
           <div className="route-node"><Server /><span>{mode === 'direct' ? '本地网络' : mode === 'fast' || mode === 'game' ? game?.name : daily?.name}</span></div><div className="route-link"><span><Check /></span></div>
           <div className="route-node"><Globe2 /><span>Internet</span></div>
         </div>
-        <div className="network-metrics"><div><span>内核</span><strong>{mode === 'direct' ? '已停用' : connected ? '运行中' : '未运行'}</strong></div><div><span>出口</span><strong>{mode === 'direct' ? '本机' : mode === 'global' ? 'VLESS' : mode === 'fast' ? 'TUIC' : mode === 'game' ? '独立 TUIC' : '自动'}</strong></div><div><span>模式</span><strong>{modeLabels[mode]}</strong></div></div>
+        <div className="network-metrics"><div><span>内核</span><strong>{mode === 'direct' ? '已停用' : connected ? '运行中' : '未运行'}</strong></div><div><span>出口</span><strong>{mode === 'tcp' ? 'TCP TLS' : mode === 'direct' ? '本机' : mode === 'global' ? 'VLESS' : mode === 'fast' ? 'TUIC' : mode === 'game' ? '独立 TUIC' : '自动'}</strong></div><div><span>模式</span><strong>{modeLabels[mode]}</strong></div></div>
       </section>
 
       <div className="connection-grid">
@@ -210,7 +210,7 @@ function ConnectionView({ state, mode, manifest, manifestSource, diagnostics, tr
         </section>
       </div>
 
-      <section className="quick-apps"><div><h2>游戏应用</h2><p>命中的应用优先使用 TUIC UDP 线路</p></div><button type="button" className="add-app-button" onClick={onOpenRules}><Plus /><span>添加游戏</span></button></section>
+      <section className="quick-apps"><div><h2>游戏应用</h2><p>{mode === 'tcp' ? 'TCP 模式 · 游戏线路使用 TCP TLS' : '命中的应用优先使用 TUIC UDP 线路'}</p></div><button type="button" className="add-app-button" onClick={onOpenRules}><Plus /><span>添加游戏</span></button></section>
     </div>
   )
 }
@@ -233,7 +233,7 @@ function RulesView({ rules, setRules }: { rules: AppRule[]; setRules: React.Disp
 function LinesView({ manifest, syncing, onRefresh }: { manifest: DeviceManifest; syncing: boolean; onRefresh: () => void }) {
   const [testing, setTesting] = useState<string | null>(null)
   const [results, setResults] = useState<Record<string, DiagnosticItem>>({})
-  const testNode = async (id: 'vless' | 'tuic') => {
+  const testNode = async (id: 'vless' | 'tuic' | 'tcp') => {
     if (testing) return
     setTesting(id)
     try {
@@ -246,15 +246,16 @@ function LinesView({ manifest, syncing, onRefresh }: { manifest: DeviceManifest;
   return (
     <div className="view">
       <header className="page-header compact"><div><h1>线路</h1><p>日常 VLESS · 游戏 TUIC</p></div><button type="button" className="secondary-button" onClick={onRefresh} disabled={syncing}><RefreshCw className={syncing ? 'spin' : ''} />{syncing ? '正在更新' : '更新配置'}</button></header>
-      <section className="node-list">{manifest.nodes.map((node) => {
-        const result = results[node.type]
+      <section className="node-list">{[...manifest.nodes, ...(manifest.tcp_node ? [manifest.tcp_node] : [])].map((node) => {
+        const testId = node.role === 'tcp' ? 'tcp' : node.type
+        const result = results[testId]
         return <article className="node-row" key={node.id}>
           <div className={'node-symbol ' + node.role}>{node.role === 'daily' ? <Cloud /> : <Zap />}</div>
-          <div className="node-name"><span className="eyebrow">{node.role === 'daily' ? '日常线路' : '游戏线路'}</span><h2>{node.name}</h2><p>{node.server}:{node.server_port}</p></div>
-          <div className="protocol-cell"><span>协议</span><strong>{node.type === 'vless' ? 'VLESS + WS + TLS' : 'TUIC + QUIC'}</strong></div>
+          <div className="node-name"><span className="eyebrow">{node.role === 'tcp' ? 'TCP 线路' : node.role === 'daily' ? '日常线路' : '游戏线路'}</span><h2>{node.name}</h2><p>{node.server}:{node.server_port}</p></div>
+          <div className="protocol-cell"><span>协议</span><strong>{node.role === 'tcp' ? 'VLESS + TCP + TLS' : node.type === 'vless' ? 'VLESS + WS + TLS' : 'TUIC + QUIC'}</strong></div>
           <div className="protocol-cell"><span>测试结果</span><strong title={result?.detail}>{result?.detail ?? '尚未测试'}</strong></div>
           <div className="latency-cell"><strong>{result?.latency !== undefined ? result.latency + ' ms' : '--'}</strong><small>HTTP 往返</small></div>
-          <button type="button" className="icon-button" disabled={testing !== null} title="测试线路" aria-label={'测试 ' + node.name} onClick={() => void testNode(node.type)}>{testing === node.type ? <RefreshCw className="spin" /> : <Play />}</button>
+          <button type="button" className="icon-button" disabled={testing !== null} title="测试线路" aria-label={'测试 ' + node.name} onClick={() => void testNode(testId)}>{testing === testId ? <RefreshCw className="spin" /> : <Play />}</button>
         </article>
       })}</section>
     </div>
@@ -383,7 +384,10 @@ function App() {
     return () => { mounted = false; window.clearTimeout(timer) }
   }, [])
 
-  const configPreview = useMemo(() => JSON.stringify(buildSingBoxConfig(manifest, { mode, appRules: rules, strictRoute: settings.strictRoute, ipv6: settings.ipv6 }), null, 2), [manifest, mode, rules, settings.strictRoute, settings.ipv6])
+  const configPreview = useMemo(() => {
+    try { return JSON.stringify(buildSingBoxConfig(manifest, { mode, appRules: rules, strictRoute: settings.strictRoute, ipv6: settings.ipv6 }), null, 2) }
+    catch (error) { return readableError(error, '配置尚未就绪') }
+  }, [manifest, mode, rules, settings.strictRoute, settings.ipv6])
 
   const saveSubscription = async (url: string) => {
     if (subscriptionBusy) return
