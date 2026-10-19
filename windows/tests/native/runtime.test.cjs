@@ -43,9 +43,14 @@ test('watchdog cleans up its designated child after owner death without killing 
   const watcher = originalSpawn(path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
     '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('electron/watchdog.ps1'),
     '-OwnerId', String(owner.pid), '-CoreId', String(target.pid), '-CoreStarted', String(started), '-CorePath', process.execPath,
-  ], { windowsHide: true, stdio: 'ignore' })
+  ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  let ready = false
+  let watcherErrors = ''
+  watcher.stdout.on('data', b => { if (String(b).includes('V2TT_WATCHDOG_READY')) ready = true })
+  watcher.stderr.on('data', b => { watcherErrors += b })
   try {
-    await wait(1500)
+    for (let i = 0; i < 300 && !ready && watcher.exitCode === null; i++) await wait(50)
+    assert.equal(ready, true, `Watchdog did not initialize: ${watcherErrors}`)
     assert.equal(watcher.exitCode, null)
     owner.kill()
     for (let i = 0; i < 100 && target.exitCode === null; i++) await wait(50)
@@ -53,6 +58,40 @@ test('watchdog cleans up its designated child after owner death without killing 
     assert.equal(unrelated.exitCode, null)
   } finally {
     for (const child of [owner, target, unrelated, watcher]) if (child.exitCode === null) child.kill()
+    await wait(100)
+  }
+})
+
+test('watchdog also cleans its verified child when the owner already exited before startup', async () => {
+  const started = Date.now() - 1000
+  const owner = originalSpawn(process.execPath, ['-e', ''], { windowsHide: true, stdio: 'ignore' })
+  await new Promise(resolve => owner.once('exit', resolve))
+  const target = originalSpawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { windowsHide: true, stdio: 'ignore' })
+  const watcher = originalSpawn(path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('electron/watchdog.ps1'),
+    '-OwnerId', String(owner.pid), '-CoreId', String(target.pid), '-CoreStarted', String(started), '-CorePath', process.execPath,
+  ], { windowsHide: true, stdio: 'ignore' })
+  try {
+    for (let i = 0; i < 300 && target.exitCode === null; i++) await wait(50)
+    assert.notEqual(target.exitCode, null)
+  } finally {
+    for (const child of [target, watcher]) if (child.exitCode === null) child.kill()
+    await wait(100)
+  }
+})
+
+test('watchdog never kills a child with mismatched executable identity', async () => {
+  const target = originalSpawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { windowsHide: true, stdio: 'ignore' })
+  const watcher = originalSpawn(path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('electron/watchdog.ps1'),
+    '-OwnerId', String(process.pid), '-CoreId', String(target.pid), '-CoreStarted', String(Date.now() - 1000), '-CorePath', process.execPath + '.wrong',
+  ], { windowsHide: true, stdio: 'ignore' })
+  try {
+    for (let i = 0; i < 300 && watcher.exitCode === null; i++) await wait(50)
+    assert.notEqual(watcher.exitCode, null)
+    assert.equal(target.exitCode, null)
+  } finally {
+    for (const child of [target, watcher]) if (child.exitCode === null) child.kill()
     await wait(100)
   }
 })
