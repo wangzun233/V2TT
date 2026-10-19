@@ -20,6 +20,15 @@ VLESS 需要 UUID、服务器、443 等实际端口、SNI、WS 路径和 Host。
 
 ## 分发安全
 
+### Windows 0.2.8 可选扩展
+
+- 顶层 `tcp_node`：独立 VLESS 节点，`role: "tcp"`、`transport: {"type":"tcp"}`，其余 TLS、UUID、服务器字段与日常节点相同。`id` 必须与两条旧节点不同；有此节点才能使用 TCP 模式。可选 `flow: "xtls-rprx-vision"` 或 `multiplex: true`，不能同时启用。
+- 顶层 `network`：`secure_dns: "tls" | "https"`、`dns_mode: "real" | "fakeip"`。省略时为 TLS DNS 与真实 IP；游戏场景会抑制 FakeIP。
+- 日常 `transport.type` 可为 `ws` 或 `httpupgrade`，两者均要求 `path`、`host`。WS 的 `max_early_data` 为 1-2048 的整数，必须与 `early_data_header_name: "Sec-WebSocket-Protocol"` 成对出现，并与服务器匹配。
+- VLESS `tls.fingerprint` 可选 `"chrome"`，默认不启用 uTLS，不接受任意 TLS 配置或关闭证书验证。
+
+以上为 Windows 新能力，不代表 Android 或旧客户端支持。协议升级应先使用独立测试订阅与匹配的服务端，不覆盖旧客户端共用入站。示例见 [服务端配套说明](../server/README.md)。
+
 每个账户一个高强度随机订阅 Token，通过 HTTPS 返回 JSON。客户端不能依赖浏览器交互式验证码或登录 Cookie；Android 不自动跟随重定向，地址应直接返回 HTTP 200 JSON。
 
 禁止把真实订阅写进仓库，包括私有仓库。响应设置 `Cache-Control: no-store`，Cloudflare 对订阅路径显式绕过缓存，不记录完整订阅 URL。管理员私下发送链接，不把真实 Token 写在教程、issue 或截图里。

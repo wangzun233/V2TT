@@ -1,0 +1,28 @@
+{
+  "description": "Reference fragments only. Choose one paired client/server option on an isolated test listener; not a complete sing-box config.",
+  "ws_early_data": {
+    "client_transport": { "type": "ws", "path": "/REPLACE_WITH_RANDOM_WS_PATH", "host": "daily.example.com", "max_early_data": 2048, "early_data_header_name": "Sec-WebSocket-Protocol" },
+    "server_transport": { "type": "ws", "path": "/REPLACE_WITH_RANDOM_WS_PATH", "max_early_data": 2048, "early_data_header_name": "Sec-WebSocket-Protocol" }
+  },
+  "httpupgrade": {
+    "client_transport": { "type": "httpupgrade", "path": "/REPLACE_WITH_RANDOM_PATH", "host": "daily.example.com" },
+    "server_transport": { "type": "httpupgrade", "path": "/REPLACE_WITH_RANDOM_PATH", "host": "daily.example.com" }
+  },
+  "tcp_vision": {
+    "client_tcp_node": {
+      "id": "tcp", "name": "Demo TCP Vision", "type": "vless", "role": "tcp", "server": "tcp.example.com", "server_port": 8443,
+      "uuid": "00000000-0000-4000-8000-000000000003", "tls": { "enabled": true, "server_name": "tcp.example.com" },
+      "transport": { "type": "tcp" }, "flow": "xtls-rprx-vision"
+    },
+    "server_inbound": {
+      "type": "vless", "tag": "tcp-vision", "listen": "::", "listen_port": 8443,
+      "users": [{ "name": "demo", "uuid": "00000000-0000-4000-8000-000000000003", "flow": "xtls-rprx-vision" }],
+      "tls": { "enabled": true, "certificate_path": "/etc/v2tt/tls/tcp/fullchain.pem", "key_path": "/etc/v2tt/tls/tcp/privkey.pem" }
+    }
+  },
+  "tcp_mux": {
+    "instructions": "Use the TCP example above with flow removed from both client and server user. Add these fields at node/inbound level, not user level.",
+    "client_tcp_node_fields": { "multiplex": true },
+    "server_inbound_fields": { "multiplex": { "enabled": true, "padding": true } }
+  }
+}

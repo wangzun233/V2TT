@@ -71,8 +71,7 @@ function log(event, details = {}) {
       fs.rmSync(`${file}.previous`, { force: true })
       fs.renameSync(file, `${file}.previous`)
     }
-    const message = details instanceof Error ? details.message : typeof details === 'string' ? details : JSON.stringify(details)
-    fs.appendFileSync(file, JSON.stringify({ time: new Date().toISOString(), event, details: redact(message) }) + '\n')
+    fs.appendFileSync(file, JSON.stringify({ time: new Date().toISOString(), event, details: redact(details) }) + '\n')
   } catch { /* Logging must not interrupt network cleanup. */ }
 }
 
@@ -355,8 +354,8 @@ register('support:export', async () => {
   const result = await dialog.showSaveDialog(window, { title: '导出诊断报告', defaultPath: `V2TT-report-${new Date().toISOString().slice(0, 10)}.json`, filters: [{ name: 'JSON', extensions: ['json'] }] })
   if (result.canceled || !result.filePath) return { saved: false }
   const report = { version: app.getVersion(), os: os.release(), arch: process.arch, time: new Date().toISOString(), status: runtime.status(),
-    diagnostics: runtime.report(), startupLog: fs.existsSync(path.join(directory, 'startup.log')) ? fs.readFileSync(path.join(directory, 'startup.log'), 'utf8').slice(-30000) : '' }
-  atomicWrite(result.filePath, JSON.stringify(report, null, 2))
+    diagnostics: runtime.report(), startupLog: fs.existsSync(path.join(directory, 'startup.log')) ? redact(fs.readFileSync(path.join(directory, 'startup.log'), 'utf8')).slice(-30000) : '' }
+  atomicWrite(result.filePath, JSON.stringify(require('./privacy.cjs').sanitize(report), null, 2))
   return { saved: true }
 })
 

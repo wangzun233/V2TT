@@ -48,6 +48,35 @@ test('a probe implementation exception is not classified as network failure', as
   try { await monitor.tick(); assert.equal(calls, 0) } finally { monitor.stop() }
 })
 
+test('sleep/resume discards pre-sleep failures before attempting recovery', async () => {
+  let time = 0, recoveries = 0
+  const counts = []
+  const monitor = createHealthMonitor({ interval: 60000, retryInterval: 60000, now: () => time,
+    sample: async () => ({ healthy: false }), onSample: r => counts.push(r.failures), onFailure: () => recoveries++ })
+  try {
+    await monitor.tick(); time += 5000; await monitor.tick()
+    time += 300000; await monitor.tick()
+    assert.deepEqual(counts, [1, 2, 1])
+    assert.equal(recoveries, 0)
+    time += 5000; await monitor.tick(); time += 5000; await monitor.tick()
+    assert.equal(recoveries, 1)
+  } finally { monitor.stop() }
+})
+
+test('recovering after a network switch clears failures; persistent DNS failure still triggers', async () => {
+  let dnsOk = false, recoveries = 0
+  const monitor = createHealthMonitor({ interval: 60000, retryInterval: 60000,
+    sample: signal => sampleHealth({ ...base(), signal, dnsProbe: async () => dnsOk, httpProbe: async () => ({ httpStatus: 200 }) }),
+    onSample: () => {}, onFailure: () => recoveries++ })
+  try {
+    await monitor.tick(); await monitor.tick()
+    dnsOk = true; await monitor.tick()
+    dnsOk = false; await monitor.tick(); await monitor.tick()
+    assert.equal(recoveries, 0)
+    await monitor.tick(); assert.equal(recoveries, 1)
+  } finally { monitor.stop() }
+})
+
 const base = () => ({ control: async () => true, dnsProbe: async () => true,
   signal: new AbortController().signal, port: 12345, password: 'test' })
 

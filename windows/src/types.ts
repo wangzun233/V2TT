@@ -10,8 +10,8 @@ export interface VlessNode {
   server: string
   server_port: number
   uuid: string
-  tls: { enabled: boolean; server_name: string }
-  transport: { type: 'ws'; path: string; host: string }
+  tls: { enabled: boolean; server_name: string; fingerprint?: 'chrome' }
+  transport: { type: 'ws' | 'httpupgrade'; path: string; host: string; max_early_data?: number; early_data_header_name?: 'Sec-WebSocket-Protocol' }
 }
 
 export interface TuicNode {
@@ -31,11 +31,14 @@ export interface TuicNode {
 export type ProxyNode = VlessNode | TuicNode
 
 export interface TcpNode extends Omit<VlessNode, 'role' | 'transport'> {
+  flow?: 'xtls-rprx-vision'
+  multiplex?: boolean
   role: 'tcp'
   transport: { type: 'tcp' }
 }
 
 export interface DeviceManifest {
+  network?: { dns_mode?: 'real' | 'fakeip'; secure_dns?: 'https' | 'tls' }
   tcp_node?: TcpNode
   schema_version: number
   generated_at: string

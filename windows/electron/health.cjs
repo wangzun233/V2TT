@@ -34,12 +34,13 @@ async function sampleHealth({ control, port, password, signal, dnsProbe = checkD
   return { healthy, controller, dns: dnsOk, web, proxy }
 }
 
-function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, retryInterval = 5000, threshold = 3 }) {
+function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, retryInterval = 5000, threshold = 3, now = Date.now, maxSampleGap = 90000 }) {
   let stopped = false
   let timer
   let failures = 0
   let notified = false
   let busy = false
+  let lastSample = null
   const abort = new AbortController()
   async function tick() {
     if (stopped || busy) return
@@ -48,6 +49,13 @@ function createHealthMonitor({ sample, onSample, onFailure, interval = 30000, re
     try {
       const result = await sample(abort.signal)
       if (stopped) return
+      const time = now()
+      // Sleep/resume or a stalled probe must not carry stale failures into recovery.
+      if (lastSample !== null && (time < lastSample || time - lastSample > maxSampleGap)) {
+        failures = 0
+        notified = false
+      }
+      lastSample = time
       failures = result.healthy ? 0 : failures + 1
       if (result.healthy) notified = false
       onSample({ ...result, failures })

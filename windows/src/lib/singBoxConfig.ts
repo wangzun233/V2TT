@@ -56,11 +56,23 @@ function vlessOutbound(node: VlessNode | TcpNode): JsonRecord {
     tls: {
       enabled: node.tls.enabled,
       server_name: node.tls.server_name,
+      ...(node.tls.fingerprint ? { utls: { enabled: true, fingerprint: node.tls.fingerprint } } : {}),
     },
+    ...(node.role === 'tcp' && node.flow ? { flow: node.flow } : {}),
+    ...(node.role === 'tcp' && node.multiplex && !node.flow ? { multiplex: {
+      enabled: true, protocol: 'h2mux', max_connections: 4, min_streams: 4, padding: true,
+    } } : {}),
     ...(node.transport.type === 'ws' ? { transport: {
       type: 'ws',
       path: node.transport.path,
       headers: { Host: node.transport.host },
+      ...(node.transport.max_early_data ? {
+        max_early_data: node.transport.max_early_data,
+        early_data_header_name: node.transport.early_data_header_name,
+      } : {}),
+    } } : {}),
+    ...(node.transport.type === 'httpupgrade' ? { transport: {
+      type: 'httpupgrade', path: node.transport.path, host: node.transport.host,
     } } : {}),
   }
 }
@@ -114,6 +126,11 @@ export function buildSingBoxConfig(
       : options.mode === 'tcp' ? 'tcp-vless' : 'daily-vless'
   const modeRules: JsonRecord[] = []
   const gameMode = options.mode === 'game'
+  // DNS may be performed by a system service, so process rules cannot reliably
+  // exempt games from FakeIP. Keep real DNS whenever game rules are active.
+  const useFakeIp = manifest.network?.dns_mode === 'fakeip' && !gameMode && options.mode !== 'direct'
+    && !activeRules.some(rule => rule.target === 'game')
+  const secureDns = manifest.network?.secure_dns ?? 'tls'
   const split = options.mode === 'smart' || options.mode === 'fast' || gameMode || options.mode === 'tcp'
   const earlyRules: JsonRecord[] = gameMode ? [
     { port: 53, action: 'hijack-dns' },
@@ -159,17 +176,20 @@ export function buildSingBoxConfig(
     dns: {
       servers: [
         {
-          type: 'tls',
+          type: secureDns,
           tag: 'secure-dns',
           server: '1.1.1.1',
-          server_port: 853,
+          server_port: secureDns === 'https' ? 443 : 853,
           detour: gameMode ? 'game-tuic' : modeFinal,
         },
         { type: 'local', tag: 'local-dns' },
+        ...(useFakeIp ? [{ type: 'fakeip', tag: 'fakeip-dns', inet4_range: '198.18.0.0/15', inet6_range: 'fc00::/18' }] : []),
       ],
-      rules: split
-        ? [{ rule_set: 'geosite-cn', server: 'local-dns' }]
-        : [],
+      rules: [
+        { domain_suffix: ['lan', 'local', 'localhost'], server: 'local-dns' },
+        ...(split ? [{ rule_set: 'geosite-cn', server: 'local-dns' }, { domain_suffix: ['cn'], server: 'local-dns' }] : []),
+        ...(useFakeIp ? [{ query_type: ['A', 'AAAA'], server: 'fakeip-dns', rewrite_ttl: 1 }] : []),
+      ],
       final: options.mode === 'direct' ? 'local-dns' : 'secure-dns',
       strategy: options.ipv6 ? 'prefer_ipv4' : 'ipv4_only',
     },

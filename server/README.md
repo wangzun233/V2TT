@@ -96,6 +96,18 @@ sudo ss -lntup
 
 ## 6. 验收与运维
 
+### Windows rc.4 可选网络能力
+
+Windows 0.2.8-rc.4 保留 DoT 为默认远程 DNS，国内与本地域名使用本地 DNS。订阅可加入 `"network": {"secure_dns":"https","dns_mode":"real"}` 选择 DoH（HTTPS 443），删除该字段或改回 `tls` 可回退；`dns_mode: "fakeip"` 仅显式启用，在游戏模式、直连模式或存在启用的游戏应用规则时仍使用真实 DNS。应用自带 DoH 不受此 DNS 规则控制。
+
+`transport-options.example.json` 是配对片段，不可直接作为完整配置启动。WS Early Data 必须同时配置两端的大小和同名请求头；HTTPUpgrade 必须更换匹配的服务端传输，并单独验证实际 CDN/反代链路，不能因为本机握手成功就认为任意 CDN 支持。Caddy 原有 WS 路径匹配不变；新传输请使用独立测试路径和后端，不替换生产路径。
+
+TCP 节点可选 `flow: "xtls-rprx-vision"` 或 `multiplex: true`，两者互斥。Vision 对应服务端用户 flow；mux 对应入站 multiplex。旧 Windows/Android 客户端可能忽略字段或拒绝 HTTPUpgrade，**不要修改这些客户端共用的现有账号与入站**。先为新版分配独立账号、入站及订阅，再切换。客户端 `tls.fingerprint: "chrome"` 可选，默认不改变 TLS 指纹，也不承诺提速。
+
+TUIC 0-RTT 保持关闭：[官方 TUIC 文档](https://sing-box.sagernet.org/configuration/inbound/tuic/) 提醒存在重放风险，通常性能收益有限。[WS 文档](https://sing-box.sagernet.org/configuration/shared/v2ray-transport/) 要求 Early Data 请求头与服务端一致。
+
+`99-v2tt-sysctl.conf.example` 只提供可选缓冲上限，不默认增大每个套接字的初始分配。先用 `sysctl net.core.rmem_max net.core.wmem_max net.ipv4.tcp_congestion_control`、`nstat -az UdpRcvbufErrors UdpSndbufErrors` 检查，记录原值并备份将修改的配置；确认瓶颈后再按需应用。BBR 不控制 TUIC 的 QUIC 拥塞算法；内核上限提高也不保证应用实际窗口提高。没有压测证据时保留已有 16 MB 等调优值。
+
 先分别验证订阅 HTTPS、日常 VLESS、游戏 TUIC，然后检查国内直连、OpenAI 相关流量、Wi-Fi/移动数据切换与锁屏。不要仅凭端口开放或延迟测试成功判定全部功能正常。
 
 日志可能包含目标域名、IP 和账号标识。排障时仅分享脱敏片段，禁止上传完整 journal、SSH 配置、证书目录或账户库。

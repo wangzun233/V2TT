@@ -11,6 +11,7 @@ import { MeasurementPanel } from './MeasurementPanel'
 import { fallbackManifest } from './data/fallbackManifest'
 import { buildSingBoxConfig } from './lib/singBoxConfig'
 import { loadManifest } from './services/controlPlane'
+import { startStatusPolling } from './lib/statusPolling'
 import { desktopBridge } from './services/desktopBridge'
 import type { ClientSettings, DesktopStatus, SubscriptionStatus } from './services/desktopBridge'
 import type { AppRule, ConnectionState, DeviceManifest, DiagnosticItem, RouteMode, RouteTarget } from './types'
@@ -33,7 +34,7 @@ const initialRules: AppRule[] = [
 
 const initialDiagnostics: DiagnosticItem[] = [
   { id: 'manifest', name: '订阅与账号', detail: '等待检查设备清单', status: 'idle' },
-  { id: 'vless', name: '日常线路', detail: 'VLESS / WebSocket / CDN', status: 'idle' },
+  { id: 'vless', name: '日常线路', detail: 'VLESS / TLS', status: 'idle' },
   { id: 'tuic', name: '游戏线路', detail: 'TUIC / UDP 443', status: 'idle' },
   { id: 'chatgpt', name: 'ChatGPT 网页', detail: '独立检查目标站可用性', status: 'idle' },
   { id: 'codex', name: 'OpenAI API 连通性', detail: '未登录 API 连通性测试', status: 'idle' },
@@ -252,7 +253,7 @@ function LinesView({ manifest, syncing, onRefresh }: { manifest: DeviceManifest;
         return <article className="node-row" key={node.id}>
           <div className={'node-symbol ' + node.role}>{node.role === 'daily' ? <Cloud /> : <Zap />}</div>
           <div className="node-name"><span className="eyebrow">{node.role === 'tcp' ? 'TCP 线路' : node.role === 'daily' ? '日常线路' : '游戏线路'}</span><h2>{node.name}</h2><p>{node.server}:{node.server_port}</p></div>
-          <div className="protocol-cell"><span>协议</span><strong>{node.role === 'tcp' ? 'VLESS + TCP + TLS' : node.type === 'vless' ? 'VLESS + WS + TLS' : 'TUIC + QUIC'}</strong></div>
+          <div className="protocol-cell"><span>协议</span><strong>{node.role === 'tcp' ? node.flow ? 'VLESS + Vision' : node.multiplex ? 'VLESS + TCP (Mux)' : 'VLESS + TCP + TLS' : node.type === 'vless' ? node.transport.type === 'httpupgrade' ? 'VLESS + HTTPUpgrade' : 'VLESS + WS + TLS' : 'TUIC + QUIC'}</strong></div>
           <div className="protocol-cell"><span>测试结果</span><strong title={result?.detail}>{result?.detail ?? '尚未测试'}</strong></div>
           <div className="latency-cell"><strong>{result?.latency !== undefined ? result.latency + ' ms' : '--'}</strong><small>HTTP 往返</small></div>
           <button type="button" className="icon-button" disabled={testing !== null} title="测试线路" aria-label={'测试 ' + node.name} onClick={() => void testNode(testId)}>{testing === testId ? <RefreshCw className="spin" /> : <Play />}</button>
@@ -339,18 +340,18 @@ function App() {
 
   useEffect(() => {
     let mounted = true
-    let timer = 0
+    let stopPolling: (() => void) | undefined
     const poll = async () => {
       try {
         const desktop = await desktopBridge.getStatus()
         if (!mounted) return
         if (!busyRef.current) applyStatus(desktop)
-        setDownloadHistory((values) => [...values.slice(1), desktop.downloadRate])
-        setUploadHistory((values) => [...values.slice(1), desktop.uploadRate])
+        if (!document.hidden) {
+          setDownloadHistory((values) => [...values.slice(1), desktop.downloadRate])
+          setUploadHistory((values) => [...values.slice(1), desktop.uploadRate])
+        }
       } catch (error) {
         if (mounted) setNativeError(readableError(error, '无法读取本机代理状态'))
-      } finally {
-        if (mounted) timer = window.setTimeout(() => void poll(), 1000)
       }
     }
     void (async () => {
@@ -378,10 +379,10 @@ function App() {
           setSubscriptionError(readableError(error, '本机配置读取失败，请重新导入'))
         }
       } finally {
-        if (mounted) { setBooting(false); void poll() }
+        if (mounted) { setBooting(false); stopPolling = startStatusPolling(poll) }
       }
     })()
-    return () => { mounted = false; window.clearTimeout(timer) }
+    return () => { mounted = false; stopPolling?.() }
   }, [])
 
   const configPreview = useMemo(() => {

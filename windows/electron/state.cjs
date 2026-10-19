@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const net = require('node:net')
+const { redact } = require('./privacy.cjs')
 
 const MODES = ['smart', 'fast', 'game', 'tcp', 'global', 'direct']
 const DEFAULT_RULES = [
@@ -83,10 +84,21 @@ function validateManifest(value) {
     if (node.tls?.enabled !== true) throw new Error('节点必须启用 TLS')
     const tls = { enabled: true, server_name: host(node.tls.server_name, 'TLS server_name') }
     if (node.type === 'vless' && node.role === 'daily') {
-      if (node.transport?.type !== 'ws') throw new Error('日常线路必须使用 WebSocket')
+      if (node.tls.fingerprint !== undefined) {
+        if (node.tls.fingerprint !== 'chrome') throw new Error('TLS fingerprint 无效')
+        tls.fingerprint = 'chrome'
+      }
+      if (!['ws', 'httpupgrade'].includes(node.transport?.type)) throw new Error('日常线路必须使用 WebSocket 或 HTTPUpgrade')
       const wsPath = text(node.transport.path, 'WebSocket path', 2048)
       if (!wsPath.startsWith('/')) throw new Error('WebSocket 路径必须以 / 开头')
-      return { ...base, type: 'vless', role: 'daily', tls, transport: { type: 'ws', path: wsPath, host: host(node.transport.host, 'WebSocket host') } }
+      const transport = { type: node.transport.type, path: wsPath, host: host(node.transport.host, 'transport host') }
+      if (node.transport.max_early_data !== undefined || node.transport.early_data_header_name !== undefined) {
+        const size = node.transport.max_early_data
+        if (transport.type !== 'ws' || !Number.isInteger(size) || size < 1 || size > 2048 || node.transport.early_data_header_name !== 'Sec-WebSocket-Protocol') throw new Error('WebSocket Early Data 参数必须成对设置，大小为 1-2048')
+        transport.max_early_data = size
+        transport.early_data_header_name = 'Sec-WebSocket-Protocol'
+      }
+      return { ...base, type: 'vless', role: 'daily', tls, transport }
     }
     if (node.type === 'tuic' && node.role === 'game') {
       if (!['bbr', 'cubic', 'new_reno'].includes(node.congestion_control) || !['native', 'quic'].includes(node.udp_relay_mode)) throw new Error('TUIC 参数无效')
@@ -110,11 +122,32 @@ function validateManifest(value) {
     ], routing: { default_mode: 'smart', daily_node: n.id, game_node: routing.game_node } }).nodes[0]
     if (nodes.some(x => x.id === checked.id)) throw new Error('TCP 节点 ID 重复')
     tcpNode = { ...checked, role: 'tcp', transport: { type: 'tcp' } }
+    if (n.flow !== undefined) {
+      if (n.flow !== 'xtls-rprx-vision') throw new Error('TCP flow 无效')
+      tcpNode.flow = n.flow
+    }
+    if (n.multiplex !== undefined) {
+      if (typeof n.multiplex !== 'boolean') throw new Error('TCP multiplex 必须是布尔值')
+      tcpNode.multiplex = n.multiplex
+    }
+    if (tcpNode.flow && tcpNode.multiplex) throw new Error('Vision 与 multiplex 不能同时启用')
+  }
+  let network
+  if (value.network !== undefined) {
+    if (!value.network || typeof value.network !== 'object' || Array.isArray(value.network)) throw new Error('network 配置无效')
+    network = {}
+    for (const [key, allowed] of [['dns_mode', ['real', 'fakeip']], ['secure_dns', ['https', 'tls']]]) {
+      if (value.network[key] !== undefined) {
+        if (!allowed.includes(value.network[key])) throw new Error(`network ${key} 无效`)
+        network[key] = value.network[key]
+      }
+    }
   }
   if (routing.default_mode === 'tcp' && !tcpNode) throw new Error('订阅缺少 TCP 线路')
   return {
     schema_version: 1, generated_at: typeof value.generated_at === 'string' ? value.generated_at : '',
     ...(tcpNode ? { tcp_node: tcpNode } : {}),
+    ...(network ? { network } : {}),
     profile: { id: profile.id, name: profile.name, expires_at: profile.expires_at, update_interval_hours: Math.min(24, Math.max(1, Number(profile.update_interval_hours) || 24)) },
     routing: { default_mode: validateMode(routing.default_mode), daily_node: routing.daily_node, game_node: routing.game_node }, nodes,
   }
@@ -124,20 +157,12 @@ function assertActive(manifest, now = Date.now()) {
   if (manifest.profile.expires_at && Date.parse(manifest.profile.expires_at) <= now) throw new Error('账号已到期，请联系管理员续期后更新订阅')
 }
 
-function redact(value) {
-  return String(value)
-    .replace(/https?:\/\/[^\s"'<>]+/gi, '[URL]')
-    .replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, '[UUID]')
-    .replace(/((?:password|secret|token|authorization)\s*[=:]\s*)[^\s,}]+/gi, '$1[REDACTED]')
-    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[IP]')
-}
-
 function publicManifest(manifest) {
   const result = structuredClone(manifest)
   for (const node of [...result.nodes, ...(result.tcp_node ? [result.tcp_node] : [])]) {
     node.uuid = '[REDACTED]'
     if (node.password) node.password = '[REDACTED]'
-    if (node.transport?.type === 'ws') node.transport.path = '/[REDACTED]'
+    if (node.transport?.path) node.transport.path = '/[REDACTED]'
   }
   return result
 }
